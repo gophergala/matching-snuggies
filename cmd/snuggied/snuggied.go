@@ -14,22 +14,6 @@ const (
 	slicerBackend = "slic3r"
 )
 
-type statusType int
-
-const (
-	accepted statusType = iota
-	processing
-	complete
-	failed
-)
-
-var statuses = []string{
-	accepted:   "accepted",
-	processing: "processing",
-	complete:   "complete",
-	failed:     "failed",
-}
-
 var config = map[string]string{
 	"version": "0.0.0",
 	"URL":     "http://localhost:8888/slicer/jobs",
@@ -39,7 +23,7 @@ func processJob(meshfile multipart.File, slicerBackend string, preset string) *s
 	job := slicerjob.New()
 
 	//do stuff to the job.
-	job.Status = "processing"
+	job.Status = slicerjob.Processing
 	job.Progress = 0.0
 	job.URL = fmt.Sprint(config["URL"]+"/", job.ID)
 
