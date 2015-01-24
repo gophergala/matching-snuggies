@@ -1,4 +1,4 @@
-package slicejob
+package slicerjob
 
 import (
 	"encoding/json"
