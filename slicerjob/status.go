@@ -21,7 +21,7 @@ const (
 // IsValid returns true if s is one of the defined Status constants
 // excluding Invalid.
 func (s Status) IsValid() bool {
-	return s > 0 && s < Invalid
+	return s >= 0 && s < Invalid
 }
 
 // UnmarshalJSON implements the json.Unmarshaler interface.
