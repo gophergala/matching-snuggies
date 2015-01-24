@@ -33,8 +33,8 @@ func main() {
 		ServerAddr: *server,
 	}
 
-	// send files to the slicer to be printed and poll the slicer until it
-	// the job has completed.
+	// send files to the slicer to be printed and poll the slicer until the job
+	// has completed.
 	log.Printf("sending file(s) to snuggied server at %v", *server)
 	job, err := client.SliceFile(*slicerBackend, *slicerPreset, meshpath)
 	if err != nil {
