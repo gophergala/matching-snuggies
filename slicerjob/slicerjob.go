@@ -1,10 +1,6 @@
 package slicerjob
 
-import (
-	"fmt"
-
-	"code.google.com/p/go-uuid/uuid"
-)
+import "code.google.com/p/go-uuid/uuid"
 
 type Job struct {
 	ID       string  `json:"id"`
@@ -17,11 +13,8 @@ type Job struct {
 // New creates a new Job with a random UUID for an ID.  If urlformat is
 // non-empty the URL of the returned job is computed as
 // fmt.Sprintf(urlformat,job.ID).
-func New(urlformat string) *Job {
+func New() *Job {
 	job := new(Job)
 	job.ID = uuid.New()
-	if urlformat != "" {
-		job.URL = fmt.Sprintf(urlformat, job.ID)
-	}
 	return job
 }
