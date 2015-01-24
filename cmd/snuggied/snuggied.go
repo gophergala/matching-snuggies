@@ -15,9 +15,10 @@ func snuggiedHandler(config map[string]string) func(http.ResponseWriter, *http.R
 		switch {
 		case (r.Method == "GET"):
 			fmt.Fprint(w, "a GET")
-
+		case (r.Method == "POST"):
+			fmt.Fprint(w, "a POST")
 		default:
-			http.Error(w, "GET only", http.StatusMethodNotAllowed)
+			http.Error(w, "not supported", http.StatusMethodNotAllowed)
 		}
 	}
 }
