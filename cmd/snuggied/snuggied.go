@@ -17,7 +17,7 @@ func snuggiedHandler(config map[string]string) func(http.ResponseWriter, *http.R
 			fmt.Fprint(w, "a GET")
 
 		default:
-			fmt.Fprint(w, "GET only")
+			http.Error(w, "GET only", http.StatusMethodNotAllowed)
 		}
 	}
 }
