@@ -3,7 +3,6 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 
 	"github.com/boltdb/bolt"
 	"github.com/gophergala/matching-snuggies/slicerjob"
@@ -84,20 +83,12 @@ func ViewJob(key string) (*slicerjob.Job, error) {
 }
 
 func CancelJob(id string) error {
-	log.Println("CancelJob called")
-	bucket := "jobs"
-	err := DB.View(func(tx *bolt.Tx) error {
-		var job = new(slicerjob.Job)
-		jsonJob := tx.Bucket(b(bucket)).Get(b(id))
-		err := json.Unmarshal(jsonJob, job)
-		if err != nil {
-			return err
-		}
-		job.Status = slicerjob.Cancelled
-		return PutJob(id, job)
-	})
-	log.Println("CancelJob end")
-	return err
+	job, err := ViewJob(id)
+	if err != nil {
+		return err
+	}
+	job.Status = slicerjob.Cancelled
+	return PutJob(id, job)
 }
 
 func DeleteJob(id string) error {
