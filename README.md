@@ -35,7 +35,7 @@ get periodic status updates while slicing is in progress.
 ./bin/snuggied -slic3r.configs=testdata
 ```
 
-Set the API [doc](blob/master/API.md) for information about each endpoint.
+Set the API [doc](API.md) for information about each endpoint.
 
 Host Integration
 ----------------
