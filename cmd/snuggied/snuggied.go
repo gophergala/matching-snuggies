@@ -23,10 +23,6 @@ var config = map[string]string{
 	"URL":     "http://localhost:8888",
 }
 
-//in-memory mockups
-var queue = make(map[string]string)
-var store = make(map[string]*slicerjob.Job)
-
 type SnuggieServer struct {
 	Config map[string]string
 
@@ -173,18 +169,32 @@ func (srv *SnuggieServer) registerJob(meshfile multipart.File, slicerBackend str
 	}
 	defer tmp.Close()
 
-	queue[job.ID] = tmp.Name()
-	store[job.ID] = job
+	PutGCodeFile(job.ID, tmp.Name())
+
+	jsonJob, err := json.Marshal(job)
+	if err != nil {
+		return nil, fmt.Errorf("job not marshalled: %v", err)
+	}
+
+	err = PutJob(job.ID, jsonJob)
+	if err != nil {
+		return nil, err
+	}
 
 	return job, nil
 }
 
 func (srv *SnuggieServer) lookupJob(id string) (*slicerjob.Job, error) {
-
-	job := store[id]
-
-	if job == nil {
+	jsonJob, err := ViewJob(id)
+	if err != nil {
 		err := fmt.Errorf("Job not found with id: %v", id)
+		return nil, err
+	}
+	var job = new(slicerjob.Job)
+	err = json.Unmarshal(jsonJob, job)
+
+	if err != nil {
+		err := fmt.Errorf("json unmarshal problem: %v", id)
 		return nil, err
 	} else {
 		log.Println("mocking status")
@@ -193,7 +203,12 @@ func (srv *SnuggieServer) lookupJob(id string) (*slicerjob.Job, error) {
 		if job.Progress >= 1.0 {
 			job.Status = slicerjob.Complete
 		}
-		store[id] = job
+		jsonJob, err := json.Marshal(job)
+		if err != nil {
+			err := fmt.Errorf("json marshal problem: %v", id)
+			return nil, err
+		}
+		PutJob(id, jsonJob)
 		//end mock progress
 	}
 	return job, nil
