@@ -48,6 +48,11 @@ type SnuggieServer struct {
 	C             Consumer
 }
 
+type SlicerPreset struct {
+	Slicer  string   `json:slicer`
+	Presets []string `json:presets`
+}
+
 func (srv *SnuggieServer) RegisterHandlers(mux *http.ServeMux) http.Handler {
 	mux.HandleFunc(srv.route("/jobs"), func(w http.ResponseWriter, r *http.Request) {
 		// the request does not have an ID suffix on the url path so we are
@@ -152,7 +157,15 @@ func (srv *SnuggieServer) GetPresets(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "only slic3r is supported at this time", http.StatusNotFound)
 		return
 	}
-	jsonPresets, err := json.Marshal(srv.Slic3rPresets)
+	var presetKeys []string
+	for k := range srv.Slic3rPresets {
+		presetKeys = append(presetKeys, k)
+	}
+	presets := &SlicerPreset{
+		Slicer:  "slic3r",
+		Presets: presetKeys,
+	}
+	jsonPresets, err := json.Marshal(presets)
 	if err != nil {
 		http.Error(w, "slic3r presets json error", http.StatusInternalServerError)
 		return
