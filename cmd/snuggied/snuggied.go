@@ -1,3 +1,19 @@
+/*
+Command snuggied is an HTTP server that exposes a REST API for 'slicing' 3D
+models, converting them into G-code machine instructions for 3D printers.
+
+	snuggied -http=:8888
+
+Clients (host software or the snuggier tool) POST 3D mesh files to snuggied
+and, after slicing is complete, snuggied exposes the resulting G-code for the
+client to retreive as a GET.  Clients periodically poll the server during
+slicing for status updates.  Clients may cancel an in-progress slicing job at
+any point by issuing a DELETE request.
+
+Call snuggied with the -h flag to see available command line configuration.
+
+	snuggied -h
+*/
 package main
 
 import (

@@ -1,3 +1,13 @@
+/*
+Command snuggier is a command line 3D slicing application that converts 3D
+models to G-code for 3D printing using a snuggied server.
+
+	snuggier -o model.gcode model.stl
+
+Call snuggier with the -h flag to see available command line configuration.
+
+	snuggier -h
+*/
 package main
 
 import (
@@ -22,7 +32,7 @@ import (
 func main() {
 	server := flag.String("server", "localhost:8888", "snuggied server address")
 	slicerBackend := flag.String("backend", "slic3r", "backend slicer")
-	slicerPreset := flag.String("preset", "hiQ", "specify a configuration preset for the backend")
+	slicerPreset := flag.String("preset", "hq", "specify a configuration preset for the backend")
 	gcodeDest := flag.String("o", "", "specify an output gcode filename")
 	flag.Parse()
 

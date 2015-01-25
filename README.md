@@ -33,7 +33,9 @@ get periodic status updates while slicing is in progress.
 ./bin/snuggied -slic3r.configs=testdata
 ```
 
-Set the API [doc](API.md) for information about each endpoint.
+See the snuggied documentation on
+[godoc.org](http://godoc.org/github.com/gophergala/matching-snuggies/cmd/snuggied).
+See the API [doc](API.md) for information about each endpoint.
 
 Command line tool
 -----------------
@@ -50,6 +52,9 @@ When `snuggied` is running on another host specify the server when calling `snug
 ```
 ./bin/snuggier -server=10.0.10.123:8888 -preset=hq -o FirstCube.gcode testdata/FirstCube.amf
 ```
+
+See the snuggier command documentation on godoc.org
+[godoc.org](http://godoc.org/github.com/gophergala/matching-snuggies/cmd/snuggier).
 
 Long term goals
 ---------------
