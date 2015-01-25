@@ -46,11 +46,13 @@ func main() {
 	if err != nil {
 		log.Fatalf("sending files: %v", err)
 	}
+
+	// poll the server until the job has completed.  use exponential backoff to
+	// reduce spam for slice slicing jobs.
 	maxTick := time.Second * 5
-	currentTick := time.Millisecond * 1
+	currentTick := 100 * time.Millisecond
 	tick := time.After(currentTick)
 	for job.Status != slicerjob.Complete {
-		// with exponential backoff on network failure
 		select {
 		case s := <-sig:
 			// stop intercepting signals. if the job cancellation is taking too
@@ -66,6 +68,9 @@ func main() {
 		case <-tick:
 			job, err = client.SlicerStatus(job)
 			if err != nil {
+				// TODO:
+				// detect potentially intermittent network failures and
+				// continue polling up to some reasonable time limit.
 				log.Fatalf("waiting: %v", err)
 			}
 
