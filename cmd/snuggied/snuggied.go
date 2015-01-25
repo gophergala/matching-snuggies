@@ -7,6 +7,7 @@ import (
 	"log"
 	"mime/multipart"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -16,16 +17,11 @@ import (
 	"github.com/gophergala/matching-snuggies/slicerjob"
 )
 
-var config = map[string]string{
-	"nodeID":  "snuggie0",
-	"version": "0.0.0",
-	"URL":     "http://localhost:8888",
-}
-
 type SnuggieServer struct {
 	Config map[string]string
 
 	// Prefix should not end in a slash '/'.
+	BaseURL       string
 	Prefix        string
 	Slic3r        string
 	Slic3rPresets map[string]string
@@ -254,7 +250,7 @@ func (srv *SnuggieServer) DeleteJob(w http.ResponseWriter, r *http.Request) {
 }
 
 func (srv *SnuggieServer) url(pathquery string) string {
-	return srv.Config["URL"] + srv.Prefix + pathquery
+	return srv.BaseURL + srv.Prefix + pathquery
 }
 
 // JobDone stores the location of the successful output g-code for job id
@@ -327,11 +323,28 @@ func (srv *SnuggieServer) runConsumerJob(job *Job) (path string, err error) {
 }
 
 func main() {
+	machineID := flag.String("name", "snuggied0", "machine name for clustering")
 	slic3rBin := flag.String("slic3r.bin", "", "specify slic3r location")
 	slic3rConfigDir := flag.String("slic3r.configs", "", "specify a directory with slic3r configuration")
 	dataDir := flag.String("data", "/tmp", "location for database, .stl, .gcode")
 	httpAddr := flag.String("http", ":8888", "address to serve traffic")
+	baseURL := flag.String("baseurl", "", "links and redirection go to the specified base url")
 	flag.Parse()
+
+	pathPrefix := "/slicer"
+	if *baseURL != "" {
+		u, err := url.Parse(*baseURL)
+		if err != nil {
+			log.Fatalf("baseurl: %v", err)
+		}
+		pathPrefix = strings.TrimSuffix(u.Path, "/")
+	} else {
+		urlHostPort := *httpAddr
+		if strings.HasPrefix(urlHostPort, ":") {
+			urlHostPort = "localhost" + urlHostPort
+		}
+		*baseURL = "http://" + urlHostPort
+	}
 
 	// make sure that dataDir is a directory and that it's path is absolute.
 	// forcing absolute paths is merely a simple way to prevent weird bugs
@@ -355,8 +368,8 @@ func main() {
 	DB = loadDB(filepath.Join(*dataDir, "snuggied.boltdb"))
 
 	srv := &SnuggieServer{
-		Config:        config,
-		Prefix:        "/slicer",
+		BaseURL:       *baseURL,
+		Prefix:        pathPrefix,
 		DataDir:       *dataDir,
 		Slic3r:        *slic3rBin,
 		Slic3rPresets: slic3rPresets,
@@ -377,6 +390,7 @@ func main() {
 	// capable of serving the result. this would be most problematic if binding
 	// the address fails.
 	go srv.RunConsumer()
+	log.Printf("machine %s binding to %s", *machineID, *httpAddr)
 	log.Fatal(http.ListenAndServe(*httpAddr, nil))
 }
 
