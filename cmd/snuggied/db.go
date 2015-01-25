@@ -81,3 +81,30 @@ func ViewJob(key string) (*slicerjob.Job, error) {
 	})
 	return job, err
 }
+
+func CancelJob(id string) error {
+	job, err := ViewJob(id)
+	if err != nil {
+		return err
+	}
+	job.Status = slicerjob.Cancelled
+	return PutJob(id, job)
+}
+
+func DeleteJob(id string) error {
+	bucket := "jobs"
+	err := DB.View(func(tx *bolt.Tx) error {
+		err := tx.Bucket(b(bucket)).Delete(b(id))
+		return err
+	})
+	return err
+}
+
+func DeleteGCodeFile(id string) error {
+	bucket := "gCodeFiles"
+	err := DB.View(func(tx *bolt.Tx) error {
+		err := tx.Bucket(b(bucket)).Delete(b(id))
+		return err
+	})
+	return err
+}
