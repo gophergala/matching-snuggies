@@ -2,9 +2,9 @@ Matching Snuggies
 =================
 
 Matching Snuggies is a slicing software that exposes a backend slicing program
-(currently slic3r) through an HTTP API.  A command line slicing tool for ease
-of use and to allow eventual integration with host software like Repetier-Host
-and OctoPrint.
+(currently slic3r) through an HTTP API.  A command line slicing tool is
+provided for ease of use and to support eventual integration with host software
+like Repetier-Host and OctoPrint.
 
 Matching Snuggies is well suited for integration with host-software that may
 run in a Resource Constrained environment.
@@ -49,8 +49,7 @@ Goals
 -----
 
 - daemon exposing slic3r over HTTP (authenticated)
-- "slicing program" -- a client that acts as a normal slicer would
-  (STL/AMF in, G-code out)
+- integration with other backend slicers (Cura)
 - a slicing queue that may be consumed by a pool of workers (shared
   configuration; dropbox?)
 - cluster health/monitoring dashboard
