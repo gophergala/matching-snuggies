@@ -65,7 +65,10 @@ func MemoryQueue(done func(id, path string, err error)) *MemQueue {
 func (q *MemQueue) jobTerminated(id string) {
 	q.cond.L.Lock()
 	delete(q.db, id)
+	qlen := len(q.jobs)
+	dblen := len(q.db)
 	q.cond.L.Unlock()
+	log.Printf("jobs running:%d queued:%d", dblen-qlen, qlen)
 }
 
 // ScheduleSliceJob enqueues a job in q.
