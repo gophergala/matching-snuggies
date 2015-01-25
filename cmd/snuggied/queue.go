@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"sync"
 )
 
@@ -52,11 +53,12 @@ type MemQueue struct {
 var _ Scheduler = new(MemQueue)
 var _ Consumer = new(MemQueue)
 
-// MemeoryQueue allocates and initializes a new MemQueue.
+// MemoryQueue allocates and initializes a new MemQueue.
 func MemoryQueue(done func(id, path string, err error)) *MemQueue {
 	return &MemQueue{
 		Done: done,
 		cond: sync.Cond{L: new(sync.Mutex)},
+		db:   make(map[string]*memJob),
 	}
 }
 
@@ -89,16 +91,23 @@ func (q *MemQueue) ScheduleSliceJob(id, meshurl, slicer, preset string) error {
 	q.cond.L.Lock()
 	q.jobs = append(q.jobs, j)
 	q.db[j.ID] = j
+	qlen := len(q.jobs)
+	dblen := len(q.db)
 	q.cond.Signal()
 	q.cond.L.Unlock()
+	log.Printf("jobs running:%d queued:%d", dblen-qlen, qlen)
 
 	return nil
 }
 
+// BUG:
+// CancelSliceJob can temporarily skew the count of queued jobs because pending
+// jobs are not removed from the queue immediately on cancellation.
 func (q *MemQueue) CancelSliceJob(id string) {
 	q.cond.L.Lock()
 	if j := q.db[id]; j != nil {
 		j.Cancel <- fmt.Errorf("the job was cancelled")
+		delete(q.db, id)
 	}
 	q.cond.L.Unlock()
 }
@@ -111,12 +120,24 @@ func (q *MemQueue) NextSliceJob() (*Job, error) {
 	}
 	j := q.jobs[0]
 	q.jobs = q.jobs[1:]
+	qlen := len(q.jobs)
+	dblen := len(q.db)
 	q.cond.L.Unlock()
+
+	select {
+	case <-j.Cancel:
+		// the job was cancelled previously get another job
+		return q.NextSliceJob()
+	default:
+	}
+
 	go func() {
 		if q.Started != nil {
 			q.Started(j.ID)
 		}
 	}()
+	log.Printf("jobs running:%d queued:%d", dblen-qlen, qlen)
+
 	return j.Job(), nil
 }
 

@@ -327,11 +327,20 @@ func main() {
 		DataDir: *dataDir,
 	}
 
+	// register http handlers
+	srv.RegisterHandlers(http.DefaultServeMux)
+
+	// the scheduler/consumer for the server are implemented using an in-memory
+	// queue.
 	memq := MemoryQueue(srv.JobDone)
 	srv.S, srv.C = memq, memq
+	srv.LocalConsumer = true // use file:// locations instead of http://
 
-	srv.RegisterHandlers(http.DefaultServeMux)
+	// BUG:
+	// there is a race condition starting the queue consumer before serving
+	// http traffic. slice jobs could be finished before the http server is
+	// capable of serving the result. this would be most problematic if binding
+	// the address fails.
 	go srv.RunConsumer()
-
 	log.Fatal(http.ListenAndServe(*httpAddr, nil))
 }
