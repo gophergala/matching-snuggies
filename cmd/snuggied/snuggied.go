@@ -239,12 +239,22 @@ func (srv *SnuggieServer) url(pathquery string) string {
 	return srv.Config["URL"] + srv.Prefix + pathquery
 }
 
-func (srv *SnuggieServer) registerGCode(id, path string) (url string, err error) {
-	// TODO write the gcode path to the database
-	url = srv.url("/gcodes/" + id)
-	return url, nil
+// JobDone stores the location of the successful output g-code for job id.  it
+// returns the url of the gcode resource.
+func (srv *SnuggieServer) JobDone(id, path string, err error) {
+	if err != nil {
+		log.Printf("FIXME -- failed job:%v err:%v", id, err)
+		return
+	}
+
+	// TODO:
+	// write the gcode path to the database
+
+	log.Printf("completed job:%v gcode:%v", id, path)
 }
 
+// RunConsumers pops jobs off the queue, fetches remote mesh files, slices
+// them, and makes the resulting gcode accessible over HTTP,
 func (srv *SnuggieServer) RunConsumer() {
 	for {
 		job, err := srv.C.NextSliceJob()
@@ -295,21 +305,13 @@ func (srv *SnuggieServer) RunConsumer() {
 			fmt.Fprintf(f, "G21 ; set units to millimeters\n")
 			fmt.Fprintf(f, "M107\n")
 			fmt.Fprintf(f, "M104 S195 ; set temperature\n")
-			log.Printf("completed job %v", job.ID)
 		}()
 		select {
 		case err := <-job.Cancel:
 			job.Done("", err)
 			// TODO: cleanup process
 		case result := <-joberr:
-			if result.err != nil {
-				job.Done("", result.err)
-			}
-			gcodeURL, err := srv.registerGCode(job.ID, result.path)
-			if err != nil {
-				job.Done("", fmt.Errorf("register output: %v", err))
-			}
-			job.Done(gcodeURL, nil)
+			job.Done(result.path, result.err)
 		}
 	}
 }
@@ -319,21 +321,15 @@ func main() {
 	httpAddr := flag.String("http", ":8888", "address to serve traffic")
 	flag.Parse()
 
-	dbfinish := func(id, location string, err error) {
-		if err != nil {
-			log.Printf("FIXME -- job failure: %v %v", id, err)
-			return
-		}
-		log.Printf("FIXME -- job result: %v gcode:%v", id, location)
-	}
-	memq := MemoryQueue(dbfinish)
 	srv := &SnuggieServer{
 		Config:  config,
 		Prefix:  "/slicer",
 		DataDir: *dataDir,
-		S:       memq,
-		C:       memq,
 	}
+
+	memq := MemoryQueue(srv.JobDone)
+	srv.S, srv.C = memq, memq
+
 	srv.RegisterHandlers(http.DefaultServeMux)
 	go srv.RunConsumer()
 

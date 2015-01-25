@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"sync"
 )
 
@@ -32,9 +31,9 @@ type Job struct {
 	Cancel <-chan error
 
 	// Done is called when the slicing process has terminated.  Done is passed
-	// a URL at which the output G-code can be retreived.  If the G-code could
+	// a path at which the output G-code can be retreived.  If the G-code could
 	// not be generated due to failure a non-nil error must be passed to Done.
-	Done func(location string, err error)
+	Done func(path string, err error)
 }
 
 // MemQueue is an in memory database and job queue that implements the
@@ -42,7 +41,7 @@ type Job struct {
 // consumers to be calling interface methods simultaneously.
 type MemQueue struct {
 	NodeID string
-	Done   func(id, location string, err error)
+	Done   func(id, path string, err error)
 	cond   sync.Cond
 	jobs   []*memJob
 	db     map[string]*memJob
@@ -52,7 +51,7 @@ var _ Scheduler = new(MemQueue)
 var _ Consumer = new(MemQueue)
 
 // MemeoryQueue allocates and initializes a new MemQueue.
-func MemoryQueue(done func(id, location string, err error)) *MemQueue {
+func MemoryQueue(done func(id, path string, err error)) *MemQueue {
 	return &MemQueue{
 		Done: done,
 		cond: sync.Cond{L: new(sync.Mutex)},
@@ -78,7 +77,6 @@ func (q *MemQueue) ScheduleSliceJob(id, meshurl, slicer, preset string) (cancel 
 	q.jobs = append(q.jobs, j)
 	q.cond.Signal()
 	q.cond.L.Unlock()
-	log.Printf("job scheduled: %#v", j)
 
 	cancel = func() { j.Cancel <- fmt.Errorf("the job was cancelled") }
 	return cancel, nil
@@ -93,7 +91,6 @@ func (q *MemQueue) NextSliceJob() (*Job, error) {
 	j := q.jobs[0]
 	q.jobs = q.jobs[1:]
 	q.cond.L.Unlock()
-	log.Printf("job dequeued: %#v", j.Job())
 	return j.Job(), nil
 }
 
@@ -116,9 +113,9 @@ func (m *memJob) Job() *Job {
 		Slicer:  m.Slicer,
 		Preset:  m.Preset,
 		Cancel:  m.Cancel,
-		Done: func(location string, err error) {
+		Done: func(path string, err error) {
 			close(m.Done)
-			m.Fin(m.ID, location, err)
+			m.Fin(m.ID, path, err)
 		},
 	}
 }
