@@ -7,7 +7,9 @@ import (
 	"log"
 	"mime/multipart"
 	"net/http"
+	"os"
 	"strings"
+	"time"
 
 	"flag"
 
@@ -19,6 +21,7 @@ const (
 )
 
 var config = map[string]string{
+	"nodeID":  "snuggie0",
 	"version": "0.0.0",
 	"URL":     "http://localhost:8888",
 }
@@ -31,8 +34,12 @@ type SnuggieServer struct {
 	Config map[string]string
 
 	// Prefix should not end in a slash '/'.
-	Prefix           string
-	MeshfileLocation string
+	Prefix  string
+	DataDir string
+
+	LocalConsumer bool
+	S             Scheduler
+	C             Consumer
 }
 
 func (srv *SnuggieServer) RegisterHandlers(mux *http.ServeMux) http.Handler {
@@ -66,6 +73,14 @@ func (srv *SnuggieServer) RegisterHandlers(mux *http.ServeMux) http.Handler {
 		switch r.Method {
 		case "GET":
 			srv.GetGCode(w, r)
+		default:
+			http.Error(w, "only GET is allowed", http.StatusMethodNotAllowed)
+		}
+	})
+	mux.HandleFunc(srv.route("/meshes/"), func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case "GET":
+			srv.GetMesh(w, r)
 		default:
 			http.Error(w, "only GET is allowed", http.StatusMethodNotAllowed)
 		}
@@ -107,6 +122,16 @@ G21 ; set units to millimeters
 M107
 M104 S195 ; set temperature
 `)
+}
+
+func (srv *SnuggieServer) GetMesh(w http.ResponseWriter, r *http.Request) {
+	id, _ := srv.trimPath(r.URL.Path, "/meshes/")
+	path := queue[id]
+	if path == "" {
+		http.Error(w, "unknown mesh id", http.StatusNotFound)
+		return
+	}
+	http.ServeFile(w, r, path)
 }
 
 func (srv *SnuggieServer) GetJob(w http.ResponseWriter, r *http.Request) {
@@ -167,7 +192,7 @@ func (srv *SnuggieServer) registerJob(meshfile multipart.File, slicerBackend str
 	job.URL = srv.url("/jobs/" + job.ID)
 
 	//if location flag not set, default temp file location is used
-	tmp, err := ioutil.TempFile(srv.MeshfileLocation, job.ID+"-")
+	tmp, err := ioutil.TempFile(srv.DataDir, job.ID+"-")
 	if err != nil {
 		return nil, fmt.Errorf("meshfile not saved: %v", err)
 	}
@@ -175,6 +200,17 @@ func (srv *SnuggieServer) registerJob(meshfile multipart.File, slicerBackend str
 
 	queue[job.ID] = tmp.Name()
 	store[job.ID] = job
+	url := srv.url("/meshes/" + job.ID)
+	if srv.LocalConsumer {
+		url = "file://" + tmp.Name()
+	}
+	_, err = srv.S.ScheduleSliceJob(job.ID, url, slicerBackend, preset)
+	if err != nil {
+		os.Remove(tmp.Name())
+		delete(queue, job.ID)
+		delete(store, job.ID)
+		return nil, err
+	}
 
 	return job, nil
 }
@@ -203,17 +239,103 @@ func (srv *SnuggieServer) url(pathquery string) string {
 	return srv.Config["URL"] + srv.Prefix + pathquery
 }
 
+func (srv *SnuggieServer) registerGCode(id, path string) (url string, err error) {
+	// TODO write the gcode path to the database
+	url = srv.url("/gcodes/" + id)
+	return url, nil
+}
+
+func (srv *SnuggieServer) RunConsumer() {
+	for {
+		job, err := srv.C.NextSliceJob()
+		if err != nil {
+			log.Printf("consumer: %v", err)
+			return
+		}
+		type jobResult struct {
+			path string
+			err  error
+		}
+		joberr := make(chan jobResult, 1)
+		go func() {
+			// slice the file at job.MeshPath and save the gcode to a file.
+			// send the out gcode's path over joberr so the call to srv.Done
+			// can be serialized with any job cancelation.
+
+			// TODO:
+			// replace code below with call to external slicer that generates
+			// gcode
+			f, err := ioutil.TempFile(srv.DataDir, "snuggied-gcode-")
+			if err != nil {
+				joberr <- jobResult{err: err}
+				return
+			}
+			defer func() {
+				select {
+				case joberr <- jobResult{path: f.Name()}:
+				default:
+				}
+			}()
+			defer func() {
+				err := f.Close()
+				if err != nil {
+					select {
+					case joberr <- jobResult{err: err}:
+					default:
+					}
+				}
+			}()
+			fmt.Fprintf(f, "; this is g-code data\n")
+			fmt.Fprintf(f, "; generated %v\n", time.Now)
+			fmt.Fprintf(f, "; perimeters extrusion width = 0.44mm\n")
+			fmt.Fprintf(f, "; infill extrusion width = 0.44mm\n")
+			fmt.Fprintf(f, "; solid infill extrusion width = 0.44mm\n")
+			fmt.Fprintf(f, "; top infill extrusion width = 0.44mm\n")
+			fmt.Fprintf(f, "\n")
+			fmt.Fprintf(f, "G21 ; set units to millimeters\n")
+			fmt.Fprintf(f, "M107\n")
+			fmt.Fprintf(f, "M104 S195 ; set temperature\n")
+			log.Printf("completed job %v", job.ID)
+		}()
+		select {
+		case err := <-job.Cancel:
+			job.Done("", err)
+			// TODO: cleanup process
+		case result := <-joberr:
+			if result.err != nil {
+				job.Done("", result.err)
+			}
+			gcodeURL, err := srv.registerGCode(job.ID, result.path)
+			if err != nil {
+				job.Done("", fmt.Errorf("register output: %v", err))
+			}
+			job.Done(gcodeURL, nil)
+		}
+	}
+}
+
 func main() {
-	meshfileLocation := flag.String("fileLocation", "", "set meshfile save location")
+	dataDir := flag.String("dataDir", "", "set meshfile save location")
 	httpAddr := flag.String("http", ":8888", "address to serve traffic")
 	flag.Parse()
 
+	dbfinish := func(id, location string, err error) {
+		if err != nil {
+			log.Printf("FIXME -- job failure: %v %v", id, err)
+			return
+		}
+		log.Printf("FIXME -- job result: %v gcode:%v", id, location)
+	}
+	memq := MemoryQueue(dbfinish)
 	srv := &SnuggieServer{
-		Config:           config,
-		Prefix:           "/slicer",
-		MeshfileLocation: *meshfileLocation,
+		Config:  config,
+		Prefix:  "/slicer",
+		DataDir: *dataDir,
+		S:       memq,
+		C:       memq,
 	}
 	srv.RegisterHandlers(http.DefaultServeMux)
+	go srv.RunConsumer()
 
 	log.Fatal(http.ListenAndServe(*httpAddr, nil))
 }

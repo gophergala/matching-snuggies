@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"strings"
+	"log"
 	"sync"
 )
 
@@ -20,10 +20,12 @@ type Consumer interface {
 }
 
 type Job struct {
-	ID       string
-	MeshPath string
-	Slicer   string
-	Preset   string
+	// NodeID is the job's originating node.
+	NodeID  string
+	ID      string
+	MeshURL string
+	Slicer  string
+	Preset  string
 
 	// Cancel receives a value if the job has been cancelled by the scheduling
 	// process.
@@ -39,10 +41,11 @@ type Job struct {
 // Scheduler and Consumer interfaces.  MemQueue is safe for many producers and
 // consumers to be calling interface methods simultaneously.
 type MemQueue struct {
-	Done func(id, location string, err error)
-	cond sync.Cond
-	jobs []*memJob
-	db   map[string]*memJob
+	NodeID string
+	Done   func(id, location string, err error)
+	cond   sync.Cond
+	jobs   []*memJob
+	db     map[string]*memJob
 }
 
 var _ Scheduler = new(MemQueue)
@@ -60,6 +63,7 @@ func MemoryQueue(done func(id, location string, err error)) *MemQueue {
 func (q *MemQueue) ScheduleSliceJob(id, meshurl, slicer, preset string) (cancel func(), err error) {
 	j := &memJob{
 		ID:       id,
+		NodeID:   q.NodeID,
 		Location: meshurl,
 		Slicer:   slicer,
 		Preset:   preset,
@@ -74,6 +78,7 @@ func (q *MemQueue) ScheduleSliceJob(id, meshurl, slicer, preset string) (cancel 
 	q.jobs = append(q.jobs, j)
 	q.cond.Signal()
 	q.cond.L.Unlock()
+	log.Printf("job scheduled: %#v", j)
 
 	cancel = func() { j.Cancel <- fmt.Errorf("the job was cancelled") }
 	return cancel, nil
@@ -88,11 +93,13 @@ func (q *MemQueue) NextSliceJob() (*Job, error) {
 	j := q.jobs[0]
 	q.jobs = q.jobs[1:]
 	q.cond.L.Unlock()
+	log.Printf("job dequeued: %#v", j.Job())
 	return j.Job(), nil
 }
 
 type memJob struct {
 	ID       string
+	NodeID   string
 	Location string
 	Slicer   string
 	Preset   string
@@ -103,11 +110,12 @@ type memJob struct {
 
 func (m *memJob) Job() *Job {
 	return &Job{
-		ID:       m.ID,
-		MeshPath: strings.TrimPrefix(m.Location, "file://"),
-		Slicer:   m.Slicer,
-		Preset:   m.Preset,
-		Cancel:   m.Cancel,
+		ID:      m.ID,
+		NodeID:  m.NodeID,
+		MeshURL: m.Location,
+		Slicer:  m.Slicer,
+		Preset:  m.Preset,
+		Cancel:  m.Cancel,
 		Done: func(location string, err error) {
 			close(m.Done)
 			m.Fin(m.ID, location, err)
