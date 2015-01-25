@@ -8,8 +8,8 @@ import (
 	"mime/multipart"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
-	"time"
 
 	"flag"
 
@@ -17,6 +17,7 @@ import (
 )
 
 const (
+	slic3rBin     = "/home/bmatsuo/3dp/RepetierHost/slic3r"
 	slicerBackend = "slic3r"
 )
 
@@ -271,40 +272,8 @@ func (srv *SnuggieServer) RunConsumer() {
 			// slice the file at job.MeshPath and save the gcode to a file.
 			// send the out gcode's path over joberr so the call to srv.Done
 			// can be serialized with any job cancelation.
-
-			// TODO:
-			// replace code below with call to external slicer that generates
-			// gcode
-			f, err := ioutil.TempFile(srv.DataDir, "snuggied-gcode-")
-			if err != nil {
-				joberr <- jobResult{err: err}
-				return
-			}
-			defer func() {
-				select {
-				case joberr <- jobResult{path: f.Name()}:
-				default:
-				}
-			}()
-			defer func() {
-				err := f.Close()
-				if err != nil {
-					select {
-					case joberr <- jobResult{err: err}:
-					default:
-					}
-				}
-			}()
-			fmt.Fprintf(f, "; this is g-code data\n")
-			fmt.Fprintf(f, "; generated %v\n", time.Now)
-			fmt.Fprintf(f, "; perimeters extrusion width = 0.44mm\n")
-			fmt.Fprintf(f, "; infill extrusion width = 0.44mm\n")
-			fmt.Fprintf(f, "; solid infill extrusion width = 0.44mm\n")
-			fmt.Fprintf(f, "; top infill extrusion width = 0.44mm\n")
-			fmt.Fprintf(f, "\n")
-			fmt.Fprintf(f, "G21 ; set units to millimeters\n")
-			fmt.Fprintf(f, "M107\n")
-			fmt.Fprintf(f, "M104 S195 ; set temperature\n")
+			path, err := srv.runConsumerJob(job)
+			joberr <- jobResult{path, err}
 		}()
 		select {
 		case err := <-job.Cancel:
@@ -314,6 +283,29 @@ func (srv *SnuggieServer) RunConsumer() {
 			job.Done(result.path, result.err)
 		}
 	}
+}
+
+func (srv *SnuggieServer) runConsumerJob(job *Job) (path string, err error) {
+	if !strings.HasPrefix(job.MeshURL, "file://") {
+		return "", fmt.Errorf("consumer cannot process: %v", job.MeshURL)
+	}
+
+	gcode := filepath.Join(srv.DataDir, job.ID+".gcode")
+	slic3r := &Slic3r{
+		Bin:        slic3rBin,
+		ConfigPath: job.Preset,
+		InPath:     strings.TrimPrefix(job.MeshURL, "file://"),
+		OutPath:    gcode,
+	}
+	err = Run(slic3r, job.Cancel)
+	if err != nil {
+		return "", fmt.Errorf("run: %v", err)
+	}
+	_, err = os.Stat(slic3r.OutPath)
+	if err != nil {
+		return "", fmt.Errorf("stat gcode: %v", err)
+	}
+	return gcode, nil
 }
 
 func main() {

@@ -16,10 +16,10 @@ type SlicerCmd struct {
 }
 
 type Slicer interface {
-	SlicerCmd() SlicerCmd
+	SlicerCmd() *SlicerCmd
 }
 
-func Run(s Slicer, kill <-chan struct{}) error {
+func Run(s Slicer, kill <-chan error) error {
 	scmd := s.SlicerCmd()
 	cmd := exec.Command(scmd.Bin, scmd.Args...)
 	cmd.Stdout = scmd.OutLog
@@ -28,23 +28,21 @@ func Run(s Slicer, kill <-chan struct{}) error {
 	if err != nil {
 		return fmt.Errorf("%s: %v", scmd.Bin, err)
 	}
-	done := make(chan struct{})
-	go func() {
+	done := make(chan error, 1)
+	go func() { done <- cmd.Wait() }()
+	for {
 		select {
-		case <-done:
-		case <-kill:
-			err := cmd.Process.Kill()
-			if err != nil {
-				log.Printf("kill: %v", err)
+		case err := <-done:
+			return err
+		case err := <-kill:
+			if errkill := cmd.Process.Kill(); err != nil {
+				// we couldn't kill the process. don't exit the loop.
+				log.Printf("kill: %v", errkill)
+				continue
 			}
+			return err
 		}
-	}()
-	err = cmd.Wait()
-	close(done)
-	if err != nil {
-		return err
 	}
-	return nil
 }
 
 type Slic3r struct {
