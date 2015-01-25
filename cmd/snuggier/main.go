@@ -46,9 +46,11 @@ func main() {
 	if err != nil {
 		log.Fatalf("sending files: %v", err)
 	}
-	tick := time.Tick(time.Second)
+	maxTick := time.Second * 5
+	currentTick := time.Millisecond * 1
+	tick := time.After(currentTick)
 	for job.Status != slicerjob.Complete {
-		// TODO: retry with exponential backoff on network failure
+		// with exponential backoff on network failure
 		select {
 		case s := <-sig:
 			// stop intercepting signals. if the job cancellation is taking too
@@ -66,6 +68,14 @@ func main() {
 			if err != nil {
 				log.Fatalf("waiting: %v", err)
 			}
+
+			if currentTick < maxTick {
+				currentTick *= 2
+			} else if currentTick > maxTick {
+				currentTick = maxTick
+			}
+			log.Println("tick", currentTick)
+			tick = time.After(currentTick)
 		}
 	}
 	// stop intercepting signals because it because much more difficult to stop
