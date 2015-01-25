@@ -194,7 +194,10 @@ func (srv *SnuggieServer) registerJob(meshfile multipart.File, slicerBackend str
 	}
 	defer tmp.Close()
 
-	PutGCodeFile(job.ID, tmp.Name())
+	err = PutMeshFile(job.ID, tmp.Name())
+	if err != nil {
+		return nil, fmt.Errorf("")
+	}
 
 	err = PutJob(job.ID, job)
 	if err != nil {
@@ -241,13 +244,18 @@ func (srv *SnuggieServer) JobDone(id, path string, err error) {
 		return
 	}
 
+	err = PutGCodeFile(id, path)
+	if err != nil {
+		log.Printf("can't put gcode file path into database: %v", err)
+	}
+
 	job, err := ViewJob(id)
 	if err != nil {
 		log.Printf("Can't view job from database:%v err:%v", id, err)
 		return
 	}
 	job.Status = slicerjob.Complete
-	job.GCodeURL = path
+	job.GCodeURL = srv.url("/gcodes/" + id)
 	job.Progress = 1.0
 
 	err = PutJob(id, job)
