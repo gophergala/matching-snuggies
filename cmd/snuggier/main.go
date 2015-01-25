@@ -68,6 +68,9 @@ func main() {
 			}
 		}
 	}
+	// stop intercepting signals because it because much more difficult to stop
+	// gracefully while reading gcode from the server.
+	signal.Stop(sig)
 
 	// download gcode from the slicer and write to the specified file.
 	log.Printf("retreiving gcode file")
