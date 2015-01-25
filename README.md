@@ -45,10 +45,16 @@ tool.
 ./bin/snuggier -preset=hq -o FirstCube.gcode testdata/FirstCube.amf
 ```
 
+When `snuggied` is running on another host specify the server when calling `snuggier`.
+
+```
+./bin/snuggier -server=10.0.10.123:8888 -preset=hq -o FirstCube.gcode testdata/FirstCube.amf
+```
+
 Long term goals
 ---------------
 
-- daemon exposing slic3r over HTTP (authenticated)
+- API authorization
 - integration with other backend slicers (Cura)
 - a slicing queue that may be consumed by a pool of workers (shared
   configuration; dropbox?)
