@@ -25,8 +25,8 @@ Build
 Slicing API
 -----------
 
-A REST API is exposed to schedule slicing joba, etrieve resulting gcode,
-and get periodic status updates while slicing is in progress.
+A REST API is exposed to schedule slicing jobs, retrieve resulting gcode, and
+get periodic status updates while slicing is in progress.
 
 ```
 ./bin/snuggied -http=:8080
