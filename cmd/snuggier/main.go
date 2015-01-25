@@ -76,10 +76,10 @@ func main() {
 
 			if currentTick < maxTick {
 				currentTick *= 2
-			} else if currentTick > maxTick {
+			}
+			if currentTick > maxTick {
 				currentTick = maxTick
 			}
-			log.Println("tick", currentTick)
 			tick = time.After(currentTick)
 		}
 	}
