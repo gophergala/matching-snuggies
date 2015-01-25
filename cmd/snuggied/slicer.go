@@ -3,9 +3,12 @@ package main
 import (
 	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
+	"path/filepath"
+	"strings"
 )
 
 type SlicerCmd struct {
@@ -21,6 +24,7 @@ type Slicer interface {
 
 func Run(s Slicer, kill <-chan error) error {
 	scmd := s.SlicerCmd()
+	log.Printf("slicing with %s %v", scmd.Bin, scmd.Args)
 	cmd := exec.Command(scmd.Bin, scmd.Args...)
 	cmd.Stdout = scmd.OutLog
 	cmd.Stderr = scmd.ErrLog
@@ -43,6 +47,23 @@ func Run(s Slicer, kill <-chan error) error {
 			return err
 		}
 	}
+}
+
+func ReadPresetsDirSlic3r(dir string) (map[string]string, error) {
+	files, err := ioutil.ReadDir(dir)
+	if err != nil {
+		return nil, err
+	}
+	m := make(map[string]string)
+	for _, file := range files {
+		ext := filepath.Ext(file.Name())
+		if ext == ".ini" {
+			name := filepath.Base(file.Name())
+			name = strings.TrimSuffix(name, ".ini")
+			m[name] = filepath.Join(dir, file.Name())
+		}
+	}
+	return m, nil
 }
 
 type Slic3r struct {

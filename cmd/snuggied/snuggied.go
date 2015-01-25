@@ -16,10 +16,6 @@ import (
 	"github.com/gophergala/matching-snuggies/slicerjob"
 )
 
-const (
-	slicerBackend = "slic3r"
-)
-
 var config = map[string]string{
 	"nodeID":  "snuggie0",
 	"version": "0.0.0",
@@ -30,9 +26,10 @@ type SnuggieServer struct {
 	Config map[string]string
 
 	// Prefix should not end in a slash '/'.
-	Prefix  string
-	Slic3r  string
-	DataDir string
+	Prefix        string
+	Slic3r        string
+	Slic3rPresets map[string]string
+	DataDir       string
 
 	LocalConsumer bool
 	S             Scheduler
@@ -153,14 +150,18 @@ func (srv *SnuggieServer) CreateJob(w http.ResponseWriter, r *http.Request) {
 	}
 
 	slicerBackend := r.FormValue("slicer")
-	if slicerBackend != slicerBackend {
+	if slicerBackend != "slic3r" {
 		http.Error(w, "slicer not supported", http.StatusBadRequest)
 		return
 	}
 
 	preset := r.FormValue("preset")
 	if preset == "" {
-		http.Error(w, "invalid quality config.", http.StatusBadRequest)
+		http.Error(w, "invalid preset", http.StatusBadRequest)
+		return
+	}
+	if path := srv.Slic3rPresets[preset]; path == "" {
+		http.Error(w, "unknown preset", http.StatusBadRequest)
 		return
 	}
 
@@ -303,8 +304,12 @@ func (srv *SnuggieServer) runConsumerJob(job *Job) (path string, err error) {
 	}
 
 	gcode := filepath.Join(srv.DataDir, job.ID+".gcode")
+	configPath := srv.Slic3rPresets[job.Preset]
+	if configPath == "" {
+		return "", fmt.Errorf("consumer: unknown preset")
+	}
 	slic3r := &Slic3r{
-		ConfigPath: job.Preset,
+		ConfigPath: configPath,
 		InPath:     strings.TrimPrefix(job.MeshURL, "file://"),
 		OutPath:    gcode,
 	}
@@ -320,7 +325,8 @@ func (srv *SnuggieServer) runConsumerJob(job *Job) (path string, err error) {
 }
 
 func main() {
-	slic3rBin := flag.String("slic3r", "", "specify slic3r location")
+	slic3rBin := flag.String("slic3r.bin", "", "specify slic3r location")
+	slic3rConfigDir := flag.String("slic3r.configs", "", "specify a directory with slic3r configuration")
 	dataDir := flag.String("data", "/tmp", "location for database, .stl, .gcode")
 	httpAddr := flag.String("http", ":8888", "address to serve traffic")
 	flag.Parse()
@@ -328,24 +334,30 @@ func main() {
 	// make sure that dataDir is a directory and that it's path is absolute.
 	// forcing absolute paths is merely a simple way to prevent weird bugs
 	// later on.
-	stat, err := os.Stat(*dataDir)
+	err := pathIsDir(*dataDir)
 	if err != nil {
 		log.Fatalf("data directory: %v", err)
-	}
-	if !stat.IsDir() {
-		log.Fatalf("data path is a not directory: %v", err)
 	}
 	if !filepath.IsAbs(*dataDir) {
 		log.Fatalf("data directory is not an absolute path: %v", *dataDir)
 	}
 
+	slic3rPresets, err := ReadPresetsDirSlic3r(*slic3rConfigDir)
+	if err != nil {
+		log.Fatalf("slic3r configs: %v", err)
+	}
+	if len(slic3rPresets) == 0 {
+		log.Fatalf("slic3r configs: no presets found")
+	}
+
 	DB = loadDB(filepath.Join(*dataDir, "snuggied.boltdb"))
 
 	srv := &SnuggieServer{
-		Config:  config,
-		Prefix:  "/slicer",
-		Slic3r:  *slic3rBin,
-		DataDir: *dataDir,
+		Config:        config,
+		Prefix:        "/slicer",
+		DataDir:       *dataDir,
+		Slic3r:        *slic3rBin,
+		Slic3rPresets: slic3rPresets,
 	}
 
 	// register http handlers
@@ -364,4 +376,15 @@ func main() {
 	// the address fails.
 	go srv.RunConsumer()
 	log.Fatal(http.ListenAndServe(*httpAddr, nil))
+}
+
+func pathIsDir(path string) error {
+	stat, err := os.Stat(path)
+	if err != nil {
+		return fmt.Errorf("data directory: %v", err)
+	}
+	if !stat.IsDir() {
+		return fmt.Errorf("data path is a not directory: %v", err)
+	}
+	return nil
 }
