@@ -204,7 +204,7 @@ func (srv *SnuggieServer) registerJob(meshfile multipart.File, slicerBackend str
 	if srv.LocalConsumer {
 		url = "file://" + tmp.Name()
 	}
-	_, err = srv.S.ScheduleSliceJob(job.ID, url, slicerBackend, preset)
+	err = srv.S.ScheduleSliceJob(job.ID, url, slicerBackend, preset)
 	if err != nil {
 		os.Remove(tmp.Name())
 		delete(queue, job.ID)

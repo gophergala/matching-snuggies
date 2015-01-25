@@ -9,7 +9,8 @@ import (
 // name of a slicer and a preset for that slicer.  Scheduler is responsible for
 // routing the job to a machine capable of servicing the request.
 type Scheduler interface {
-	ScheduleSliceJob(id, meshurl, slicer, preset string) (cancel func(), err error)
+	ScheduleSliceJob(id, meshurl, slicer, preset string) error
+	CancelSliceJob(id string)
 }
 
 // Consumer is the read-end of a job queue.  It reserves a from the queue and
@@ -40,11 +41,12 @@ type Job struct {
 // Scheduler and Consumer interfaces.  MemQueue is safe for many producers and
 // consumers to be calling interface methods simultaneously.
 type MemQueue struct {
-	NodeID string
-	Done   func(id, path string, err error)
-	cond   sync.Cond
-	jobs   []*memJob
-	db     map[string]*memJob
+	NodeID  string
+	Started func(id string)
+	Done    func(id, path string, err error)
+	cond    sync.Cond
+	jobs    []*memJob
+	db      map[string]*memJob
 }
 
 var _ Scheduler = new(MemQueue)
@@ -58,8 +60,14 @@ func MemoryQueue(done func(id, path string, err error)) *MemQueue {
 	}
 }
 
+func (q *MemQueue) jobTerminated(id string) {
+	q.cond.L.Lock()
+	delete(q.db, id)
+	q.cond.L.Unlock()
+}
+
 // ScheduleSliceJob enqueues a job in q.
-func (q *MemQueue) ScheduleSliceJob(id, meshurl, slicer, preset string) (cancel func(), err error) {
+func (q *MemQueue) ScheduleSliceJob(id, meshurl, slicer, preset string) error {
 	j := &memJob{
 		ID:       id,
 		NodeID:   q.NodeID,
@@ -68,18 +76,31 @@ func (q *MemQueue) ScheduleSliceJob(id, meshurl, slicer, preset string) (cancel 
 		Preset:   preset,
 		Cancel:   make(chan error, 1),
 		Done:     make(chan struct{}),
-		Fin:      q.Done,
+		Fin: func(id, path string, err error) {
+			q.jobTerminated(id)
+			if q.Done != nil {
+				q.Done(id, path, err)
+			}
+		},
 	}
 
 	// append the job to the queue and signal a waiting consumer goroutine to
 	// wake up and process the job.
 	q.cond.L.Lock()
 	q.jobs = append(q.jobs, j)
+	q.db[j.ID] = j
 	q.cond.Signal()
 	q.cond.L.Unlock()
 
-	cancel = func() { j.Cancel <- fmt.Errorf("the job was cancelled") }
-	return cancel, nil
+	return nil
+}
+
+func (q *MemQueue) CancelSliceJob(id string) {
+	q.cond.L.Lock()
+	if j := q.db[id]; j != nil {
+		j.Cancel <- fmt.Errorf("the job was cancelled")
+	}
+	q.cond.L.Unlock()
 }
 
 // NextSliceJob dequeues a job from q or blocks until one is available.
@@ -91,6 +112,11 @@ func (q *MemQueue) NextSliceJob() (*Job, error) {
 	j := q.jobs[0]
 	q.jobs = q.jobs[1:]
 	q.cond.L.Unlock()
+	go func() {
+		if q.Started != nil {
+			q.Started(j.ID)
+		}
+	}()
 	return j.Job(), nil
 }
 
