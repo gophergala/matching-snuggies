@@ -2,11 +2,15 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"mime/multipart"
 	"net/http"
 	"strings"
+
+	"flag"
 
 	"github.com/gophergala/matching-snuggies/slicerjob"
 )
@@ -20,11 +24,16 @@ var config = map[string]string{
 	"URL":     "http://localhost:8888",
 }
 
+//in-memory mockups
+var queue = make(map[string]string)
+var store = make(map[string]*slicerjob.Job)
+
 type SnuggieServer struct {
 	Config map[string]string
 
 	// Prefix should not end in a slash '/'.
-	Prefix string
+	Prefix           string
+	MeshfileLocation string
 }
 
 func (srv *SnuggieServer) RegisterHandlers(mux *http.ServeMux) http.Handler {
@@ -158,16 +167,35 @@ func (srv *SnuggieServer) registerJob(meshfile multipart.File, slicerBackend str
 	job.Progress = 0.0
 	job.URL = srv.url("/jobs/" + job.ID)
 
+	//if location flag not set, default temp file location is used
+	tmp, err := ioutil.TempFile(srv.MeshfileLocation, job.ID+"-")
+	if err != nil {
+		return nil, fmt.Errorf("meshfile not saved: %v", err)
+	}
+	defer tmp.Close()
+
+	queue[job.ID] = tmp.Name()
+	store[job.ID] = job
+
 	return job, nil
 }
 
 func (srv *SnuggieServer) lookupJob(id string) (*slicerjob.Job, error) {
-	job := &slicerjob.Job{
-		ID:       id,
-		Status:   slicerjob.Complete,
-		Progress: 1,
-		URL:      srv.url("/jobs/" + id),
-		GCodeURL: srv.url("/gcodes/" + id),
+
+	job := store[id]
+
+	if job == nil {
+		err := errors.New(fmt.Sprintf("Job not found with id: %v", id))
+		return nil, err
+	} else {
+		log.Println("mocking status")
+		//mock progress
+		job.Progress += 0.1
+		if job.Progress >= 1.0 {
+			job.Status = slicerjob.Complete
+		}
+		store[id] = job
+		//end mock progress
 	}
 	return job, nil
 }
@@ -177,11 +205,16 @@ func (srv *SnuggieServer) url(pathquery string) string {
 }
 
 func main() {
+	meshfileLocation := flag.String("fileLocation", "", "set meshfile save location")
+	httpAddr := flag.String("http", ":8888", "address to serve traffic")
+	flag.Parse()
+
 	srv := &SnuggieServer{
-		Config: config,
-		Prefix: "/slicer",
+		Config:           config,
+		Prefix:           "/slicer",
+		MeshfileLocation: *meshfileLocation,
 	}
 	srv.RegisterHandlers(http.DefaultServeMux)
 
-	log.Fatal(http.ListenAndServe(":8888", nil))
+	log.Fatal(http.ListenAndServe(*httpAddr, nil))
 }
