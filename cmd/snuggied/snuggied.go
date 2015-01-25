@@ -15,22 +15,6 @@ const (
 	slicerBackend = "slic3r"
 )
 
-type statusType int
-
-const (
-	accepted statusType = iota
-	processing
-	complete
-	failed
-)
-
-var statuses = []string{
-	accepted:   "accepted",
-	processing: "processing",
-	complete:   "complete",
-	failed:     "failed",
-}
-
 var config = map[string]string{
 	"version": "0.0.0",
 	"URL":     "http://localhost:8888",
@@ -170,7 +154,7 @@ func (srv *SnuggieServer) registerJob(meshfile multipart.File, slicerBackend str
 	job := slicerjob.New()
 
 	//do stuff to the job.
-	job.Status = "accepted"
+	job.Status = slicerjob.Accepted
 	job.Progress = 0.0
 	job.URL = srv.url("/jobs/" + job.ID)
 
@@ -180,7 +164,7 @@ func (srv *SnuggieServer) registerJob(meshfile multipart.File, slicerBackend str
 func (srv *SnuggieServer) lookupJob(id string) (*slicerjob.Job, error) {
 	job := &slicerjob.Job{
 		ID:       id,
-		Status:   "complete",
+		Status:   slicerjob.Complete,
 		Progress: 1,
 		URL:      srv.url("/jobs/" + id),
 		GCodeURL: srv.url("/gcodes/" + id),
