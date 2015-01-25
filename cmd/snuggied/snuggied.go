@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -185,7 +184,7 @@ func (srv *SnuggieServer) lookupJob(id string) (*slicerjob.Job, error) {
 	job := store[id]
 
 	if job == nil {
-		err := errors.New(fmt.Sprintf("Job not found with id: %v", id))
+		err := fmt.Errorf("Job not found with id: %v", id)
 		return nil, err
 	} else {
 		log.Println("mocking status")
