@@ -26,10 +26,6 @@ var config = map[string]string{
 	"URL":     "http://localhost:8888",
 }
 
-//in-memory mockups
-var queue = make(map[string]string)
-var store = make(map[string]*slicerjob.Job)
-
 type SnuggieServer struct {
 	Config map[string]string
 
@@ -198,8 +194,12 @@ func (srv *SnuggieServer) registerJob(meshfile multipart.File, slicerBackend str
 	}
 	defer tmp.Close()
 
-	queue[job.ID] = tmp.Name()
-	store[job.ID] = job
+	PutGCodeFile(job.ID, tmp.Name())
+
+	err = PutJob(job.ID, job)
+	if err != nil {
+		return nil, err
+	}
 	url := srv.url("/meshes/" + job.ID)
 	if srv.LocalConsumer {
 		url = "file://" + tmp.Name()
@@ -207,8 +207,9 @@ func (srv *SnuggieServer) registerJob(meshfile multipart.File, slicerBackend str
 	err = srv.S.ScheduleSliceJob(job.ID, url, slicerBackend, preset)
 	if err != nil {
 		os.Remove(tmp.Name())
-		delete(queue, job.ID)
-		delete(store, job.ID)
+		//TODO:
+		//DeleteGCodeFile(job.ID)
+		//DeleteJob(job.ID)
 		return nil, err
 	}
 
@@ -216,11 +217,14 @@ func (srv *SnuggieServer) registerJob(meshfile multipart.File, slicerBackend str
 }
 
 func (srv *SnuggieServer) lookupJob(id string) (*slicerjob.Job, error) {
-
-	job := store[id]
-
-	if job == nil {
+	job, err := ViewJob(id)
+	if err != nil {
 		err := fmt.Errorf("Job not found with id: %v", id)
+		return nil, err
+	}
+
+	if err != nil {
+		err := fmt.Errorf("json unmarshal problem: %v", id)
 		return nil, err
 	} else {
 		log.Println("mocking status")
@@ -229,7 +233,7 @@ func (srv *SnuggieServer) lookupJob(id string) (*slicerjob.Job, error) {
 		if job.Progress >= 1.0 {
 			job.Status = slicerjob.Complete
 		}
-		store[id] = job
+		PutJob(id, job)
 		//end mock progress
 	}
 	return job, nil
