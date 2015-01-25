@@ -309,6 +309,7 @@ func (srv *SnuggieServer) runConsumerJob(job *Job) (path string, err error) {
 		return "", fmt.Errorf("consumer: unknown preset")
 	}
 	slic3r := &Slic3r{
+		Bin:        srv.Slic3r,
 		ConfigPath: configPath,
 		InPath:     strings.TrimPrefix(job.MeshURL, "file://"),
 		OutPath:    gcode,
