@@ -17,8 +17,11 @@ host device.  However I do not think it is immediately possible.
 Documentation
 =============
 
-Build
------
+Install
+-------
+
+First install [slic3r](http://slic3r.org/download), the slic3r Matching
+Snuggies has chosen to support initially.
 
 ./build.sh
 

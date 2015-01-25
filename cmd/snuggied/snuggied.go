@@ -17,7 +17,6 @@ import (
 )
 
 const (
-	slic3rBin     = "/home/bmatsuo/3dp/RepetierHost/slic3r"
 	slicerBackend = "slic3r"
 )
 
@@ -32,6 +31,7 @@ type SnuggieServer struct {
 
 	// Prefix should not end in a slash '/'.
 	Prefix  string
+	Slic3r  string
 	DataDir string
 
 	LocalConsumer bool
@@ -304,7 +304,6 @@ func (srv *SnuggieServer) runConsumerJob(job *Job) (path string, err error) {
 
 	gcode := filepath.Join(srv.DataDir, job.ID+".gcode")
 	slic3r := &Slic3r{
-		Bin:        slic3rBin,
 		ConfigPath: job.Preset,
 		InPath:     strings.TrimPrefix(job.MeshURL, "file://"),
 		OutPath:    gcode,
@@ -321,6 +320,7 @@ func (srv *SnuggieServer) runConsumerJob(job *Job) (path string, err error) {
 }
 
 func main() {
+	slic3rBin := flag.String("slic3r", "", "specify slic3r location")
 	dataDir := flag.String("data", "/tmp", "location for database, .stl, .gcode")
 	httpAddr := flag.String("http", ":8888", "address to serve traffic")
 	flag.Parse()
@@ -344,6 +344,7 @@ func main() {
 	srv := &SnuggieServer{
 		Config:  config,
 		Prefix:  "/slicer",
+		Slic3r:  *slic3rBin,
 		DataDir: *dataDir,
 	}
 
