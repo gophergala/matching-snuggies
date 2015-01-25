@@ -1,26 +1,53 @@
 package main
 
-type Slicer struct {
+import (
+	"fmt"
+	"io"
+	"os"
+)
+
+type SlicerCmd struct {
 	Bin  string
 	Args []string
+	Log  io.Writer
 }
 
-func (s *Slicer) Start() error {
+type Slicer interface {
+	SlicerCmd() SlicerCmd
 }
 
-func Slic3r(bin, outfile, infile string) *Slicer {
+func Run(s Slicer, kill <-chan struct{}) error {
+	return fmt.Errorf("x")
+}
+
+type Slic3r struct {
+	Bin        string
+	ConfigPath string
+	OutPath    string
+	InPath     string
+}
+
+func (s *Slic3r) SlicerCmd() *SlicerCmd {
+	bin := s.Bin
 	if bin == "" {
 		bin = "slic3r"
 	}
 	var args []string
-	if outfile != "" {
-		args = append(args, "-o", outfile)
+	config := s.ConfigPath
+	if config != "" {
+		args = append(args, config)
 	}
-	if infile != "" {
-		args = append(args, infile)
+	out := s.OutPath
+	if out != "" {
+		args = append(args, "-o", out)
 	}
-	return &Slicer{
+	in := s.InPath
+	if in != "" {
+		args = append(args, in)
+	}
+	return &SlicerCmd{
 		Bin:  bin,
-		Args: []string{"-o", outfile, infile},
+		Args: args,
+		Log:  os.Stderr,
 	}
 }
