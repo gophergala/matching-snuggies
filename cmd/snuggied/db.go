@@ -12,10 +12,10 @@ func b(s string) []byte {
 	return []byte(s)
 }
 
-var DB = loadDB()
+var DB *bolt.DB
 
-func loadDB() *bolt.DB {
-	db, err := bolt.Open("db", 0666, nil)
+func loadDB(path string) *bolt.DB {
+	db, err := bolt.Open(path, 0666, nil)
 	if err != nil {
 		panic(err)
 	}
