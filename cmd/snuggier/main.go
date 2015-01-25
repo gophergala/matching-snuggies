@@ -41,7 +41,7 @@ func main() {
 		log.Fatalf("sending files: %v", err)
 	}
 	tick := time.After(100 * time.Millisecond)
-	for job.Status != "complete" {
+	for job.Status != slicerjob.Complete {
 		// TODO: retry with exponential backoff on network failure
 		select {
 		case <-tick:
