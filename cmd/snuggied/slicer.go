@@ -39,7 +39,8 @@ func Run(s Slicer, kill <-chan error) error {
 		case err := <-done:
 			return err
 		case err := <-kill:
-			if errkill := cmd.Process.Kill(); err != nil {
+			log.Printf("killing process %v", cmd.Process.Pid)
+			if errkill := cmd.Process.Kill(); errkill != nil {
 				// we couldn't kill the process. don't exit the loop.
 				log.Printf("kill: %v", errkill)
 				continue

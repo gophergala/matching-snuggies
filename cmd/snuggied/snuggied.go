@@ -293,26 +293,7 @@ func (srv *SnuggieServer) RunConsumer() {
 			log.Printf("consumer: %v", err)
 			return
 		}
-
-		type jobResult struct {
-			path string
-			err  error
-		}
-		joberr := make(chan jobResult, 1)
-		go func() {
-			// slice the file at job.MeshPath and save the gcode to a file.
-			// send the out gcode's path over joberr so the call to srv.Done
-			// can be serialized with any job cancelation.
-			path, err := srv.runConsumerJob(job)
-			joberr <- jobResult{path, err}
-		}()
-		select {
-		case err := <-job.Cancel:
-			job.Done("", err)
-			// TODO: cleanup process
-		case result := <-joberr:
-			job.Done(result.path, result.err)
-		}
+		job.Done(srv.runConsumerJob(job))
 	}
 }
 
