@@ -7,7 +7,7 @@ provided for ease of use and to support eventual integration with host software
 like Repetier-Host and OctoPrint.
 
 Matching Snuggies is well suited for integration with host-software that may
-run in a Resource Constrained environment.
+run in a resource constrained environment, such as a Raspberry Pi.
 
 Documentation
 =============
