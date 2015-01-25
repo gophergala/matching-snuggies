@@ -120,11 +120,11 @@ func (c *Client) SliceFile(backend, preset string, path string) (*slicerjob.Job,
 	if err != nil {
 		return nil, fmt.Errorf("tempfile: %v", err)
 	}
-	url := c.url("/slicer/jobs/")
+	url := c.url("/slicer/jobs")
 	log.Printf("POST %v", url)
 	resp, err := c.client().Post(url, bodyw.FormDataContentType(), tmp)
 	if err != nil {
-		return nil, fmt.Errorf("POST /slicer/jobs/: %v", err)
+		return nil, fmt.Errorf("POST /slicer/jobs: %v", err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != 200 {
@@ -184,8 +184,7 @@ func (c *Client) SlicerStatus(job *slicerjob.Job) (*slicerjob.Job, error) {
 
 // GCode requests the gcode for job.
 func (c *Client) GCode(job *slicerjob.Job) (io.ReadCloser, error) {
-	var jobcurr *slicerjob.Job
-	url := c.url("/slicer/gcodes/" + jobcurr.ID)
+	url := c.url("/slicer/gcodes/" + job.ID)
 	log.Printf("POST %v", url)
 	resp, err := c.client().Get(url)
 	if err != nil {
