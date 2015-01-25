@@ -338,6 +338,8 @@ func main() {
 		log.Fatalf("data directory is not an absolute path: %v", *dataDir)
 	}
 
+	DB = loadDB(filepath.Join(*dataDir, "snuggied.boltdb"))
+
 	srv := &SnuggieServer{
 		Config:  config,
 		Prefix:  "/slicer",
