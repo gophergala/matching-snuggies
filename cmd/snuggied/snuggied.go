@@ -3,13 +3,13 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"log"
 	"mime/multipart"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
-	"time"
 
 	"flag"
 
@@ -17,6 +17,7 @@ import (
 )
 
 const (
+	slic3rBin     = "/home/bmatsuo/3dp/RepetierHost/slic3r"
 	slicerBackend = "slic3r"
 )
 
@@ -145,7 +146,7 @@ func (srv *SnuggieServer) GetJob(w http.ResponseWriter, r *http.Request) {
 
 func (srv *SnuggieServer) CreateJob(w http.ResponseWriter, r *http.Request) {
 	//TODO make sure meshfile is at least .stl
-	meshfile, _, err := r.FormFile("meshfile")
+	meshfile, fileheader, err := r.FormFile("meshfile")
 	if err != nil {
 		http.Error(w, "bad meshfile, or 'meshfile' field not present", http.StatusBadRequest)
 		return
@@ -163,7 +164,7 @@ func (srv *SnuggieServer) CreateJob(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	job, err := srv.registerJob(meshfile, slicerBackend, preset)
+	job, err := srv.registerJob(meshfile, fileheader, slicerBackend, preset)
 	if err != nil {
 		// TODO: distinguish unknown preset (Bad Request) from backend failure.
 		http.Error(w, "registration failed: "+err.Error(), http.StatusInternalServerError)
@@ -179,7 +180,7 @@ func (srv *SnuggieServer) CreateJob(w http.ResponseWriter, r *http.Request) {
 	w.Write(jsonJob)
 }
 
-func (srv *SnuggieServer) registerJob(meshfile multipart.File, slicerBackend string, preset string) (*slicerjob.Job, error) {
+func (srv *SnuggieServer) registerJob(meshfile multipart.File, header *multipart.FileHeader, slicerBackend string, preset string) (*slicerjob.Job, error) {
 	job := slicerjob.New()
 
 	//do stuff to the job.
@@ -188,25 +189,32 @@ func (srv *SnuggieServer) registerJob(meshfile multipart.File, slicerBackend str
 	job.URL = srv.url("/jobs/" + job.ID)
 
 	//if location flag not set, default temp file location is used
-	tmp, err := ioutil.TempFile(srv.DataDir, job.ID+"-")
+	ext := filepath.Ext(header.Filename)
+	path := filepath.Join(srv.DataDir, job.ID+ext)
+	f, err := os.Create(path)
 	if err != nil {
-		return nil, fmt.Errorf("meshfile not saved: %v", err)
+		return nil, fmt.Errorf("meshfile create: %v", err)
 	}
-	defer tmp.Close()
+	_, err = io.Copy(f, meshfile)
+	if err != nil {
+		f.Close()
+		return nil, fmt.Errorf("meshfile write: %v", err)
+	}
 
-	PutGCodeFile(job.ID, tmp.Name())
+	PutGCodeFile(job.ID, path)
 
 	err = PutJob(job.ID, job)
 	if err != nil {
 		return nil, err
 	}
+
 	url := srv.url("/meshes/" + job.ID)
 	if srv.LocalConsumer {
-		url = "file://" + tmp.Name()
+		url = "file://" + path
 	}
 	err = srv.S.ScheduleSliceJob(job.ID, url, slicerBackend, preset)
 	if err != nil {
-		os.Remove(tmp.Name())
+		os.Remove(path)
 		//TODO:
 		//DeleteGCodeFile(job.ID)
 		//DeleteJob(job.ID)
@@ -276,40 +284,8 @@ func (srv *SnuggieServer) RunConsumer() {
 			// slice the file at job.MeshPath and save the gcode to a file.
 			// send the out gcode's path over joberr so the call to srv.Done
 			// can be serialized with any job cancelation.
-
-			// TODO:
-			// replace code below with call to external slicer that generates
-			// gcode
-			f, err := ioutil.TempFile(srv.DataDir, "snuggied-gcode-")
-			if err != nil {
-				joberr <- jobResult{err: err}
-				return
-			}
-			defer func() {
-				select {
-				case joberr <- jobResult{path: f.Name()}:
-				default:
-				}
-			}()
-			defer func() {
-				err := f.Close()
-				if err != nil {
-					select {
-					case joberr <- jobResult{err: err}:
-					default:
-					}
-				}
-			}()
-			fmt.Fprintf(f, "; this is g-code data\n")
-			fmt.Fprintf(f, "; generated %v\n", time.Now)
-			fmt.Fprintf(f, "; perimeters extrusion width = 0.44mm\n")
-			fmt.Fprintf(f, "; infill extrusion width = 0.44mm\n")
-			fmt.Fprintf(f, "; solid infill extrusion width = 0.44mm\n")
-			fmt.Fprintf(f, "; top infill extrusion width = 0.44mm\n")
-			fmt.Fprintf(f, "\n")
-			fmt.Fprintf(f, "G21 ; set units to millimeters\n")
-			fmt.Fprintf(f, "M107\n")
-			fmt.Fprintf(f, "M104 S195 ; set temperature\n")
+			path, err := srv.runConsumerJob(job)
+			joberr <- jobResult{path, err}
 		}()
 		select {
 		case err := <-job.Cancel:
@@ -321,8 +297,31 @@ func (srv *SnuggieServer) RunConsumer() {
 	}
 }
 
+func (srv *SnuggieServer) runConsumerJob(job *Job) (path string, err error) {
+	if !strings.HasPrefix(job.MeshURL, "file://") {
+		return "", fmt.Errorf("consumer cannot process: %v", job.MeshURL)
+	}
+
+	gcode := filepath.Join(srv.DataDir, job.ID+".gcode")
+	slic3r := &Slic3r{
+		Bin:        slic3rBin,
+		ConfigPath: job.Preset,
+		InPath:     strings.TrimPrefix(job.MeshURL, "file://"),
+		OutPath:    gcode,
+	}
+	err = Run(slic3r, job.Cancel)
+	if err != nil {
+		return "", fmt.Errorf("run: %v", err)
+	}
+	_, err = os.Stat(slic3r.OutPath)
+	if err != nil {
+		return "", fmt.Errorf("stat gcode: %v", err)
+	}
+	return gcode, nil
+}
+
 func main() {
-	dataDir := flag.String("dataDir", "", "set meshfile save location")
+	dataDir := flag.String("dataDir", "/tmp", "location for database, .stl, .gcode")
 	httpAddr := flag.String("http", ":8888", "address to serve traffic")
 	flag.Parse()
 
