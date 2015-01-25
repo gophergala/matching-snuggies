@@ -46,7 +46,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("sending files: %v", err)
 	}
-	tick := time.Tick(100 * time.Millisecond)
+	tick := time.Tick(time.Second)
 	for job.Status != slicerjob.Complete {
 		// TODO: retry with exponential backoff on network failure
 		select {
