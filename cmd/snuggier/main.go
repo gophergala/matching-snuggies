@@ -148,8 +148,7 @@ func (c *Client) SliceFile(backend, preset string, path string) (*slicerjob.Job,
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != 200 {
-		p, _ := ioutil.ReadAll(resp.Body)
-		return nil, fmt.Errorf("response: %q (%v)", p, http.StatusText(resp.StatusCode))
+		return nil, httpStatusError(resp)
 	}
 	err = json.NewDecoder(resp.Body).Decode(&job)
 	if err != nil {
@@ -194,8 +193,7 @@ func (c *Client) Cancel(job *slicerjob.Job) error {
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != 200 {
-		body, _ := ioutil.ReadAll(resp.Body)
-		return fmt.Errorf("HTTP %v: %s", http.StatusText(resp.StatusCode), body)
+		return httpStatusError(resp)
 	}
 	return nil
 }
@@ -214,8 +212,7 @@ func (c *Client) SlicerStatus(job *slicerjob.Job) (*slicerjob.Job, error) {
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != 200 {
-		p, _ := ioutil.ReadAll(resp.Body)
-		return nil, fmt.Errorf("response: %q (%v)", p, http.StatusText(resp.StatusCode))
+		return nil, httpStatusError(resp)
 	}
 	err = json.NewDecoder(resp.Body).Decode(&jobcurr)
 	if err != nil {
@@ -233,8 +230,7 @@ func (c *Client) GCode(job *slicerjob.Job) (io.ReadCloser, error) {
 		return nil, fmt.Errorf("POST /slicer/jobs/: %v", err)
 	}
 	if resp.StatusCode != 200 {
-		p, _ := ioutil.ReadAll(resp.Body)
-		return nil, fmt.Errorf("response: %q (%v)", p, http.StatusText(resp.StatusCode))
+		return nil, httpStatusError(resp)
 	}
 	return resp.Body, nil
 }
@@ -262,4 +258,27 @@ var meshExts = map[string]bool{
 
 func IsMeshFile(path string) bool {
 	return meshExts[filepath.Ext(path)]
+}
+
+func httpStatusError(resp *http.Response) error {
+	p, _ := ioutil.ReadAll(io.LimitReader(resp.Body, 85))
+	msg := trimMessage(string(p), 80)
+	return fmt.Errorf("http %d %s: %q", resp.StatusCode, http.StatusText(resp.StatusCode), msg)
+}
+
+func trimMessage(s string, n int) string {
+	s = strings.TrimSpace(s)
+	if len(s) < n {
+		return s
+	}
+	var rs []rune
+	var m int
+	for _, c := range s {
+		if m >= n {
+			break
+		}
+		rs = append(rs, c)
+		m++
+	}
+	return string(rs) + "..."
 }
