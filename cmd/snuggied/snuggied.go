@@ -137,12 +137,7 @@ func (srv *SnuggieServer) GetJob(w http.ResponseWriter, r *http.Request) {
 }
 
 func (srv *SnuggieServer) CreateJob(w http.ResponseWriter, r *http.Request) {
-	//TODO make sure meshfile is at least .stl
-	meshfile, fileheader, err := r.FormFile("meshfile")
-	if err != nil {
-		http.Error(w, "bad meshfile, or 'meshfile' field not present", http.StatusBadRequest)
-		return
-	}
+	defer r.Body.Close()
 
 	slicerBackend := r.FormValue("slicer")
 	if slicerBackend != "slic3r" {
@@ -157,6 +152,13 @@ func (srv *SnuggieServer) CreateJob(w http.ResponseWriter, r *http.Request) {
 	}
 	if path := srv.Slic3rPresets[preset]; path == "" {
 		http.Error(w, "unknown preset", http.StatusBadRequest)
+		return
+	}
+
+	//TODO make sure meshfile is at least .stl
+	meshfile, fileheader, err := r.FormFile("meshfile")
+	if err != nil {
+		http.Error(w, "bad meshfile, or 'meshfile' field not present", http.StatusBadRequest)
 		return
 	}
 
