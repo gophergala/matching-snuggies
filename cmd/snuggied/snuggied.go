@@ -55,8 +55,8 @@ func (srv *SnuggieServer) RegisterHandlers(mux *http.ServeMux) http.Handler {
 		switch r.Method {
 		case "GET":
 			srv.GetJob(w, r)
-		// TODO:
-		// allow DELETE requests to cancel jobs
+		case "DELETE":
+			srv.DeleteJob(w, r)
 		default:
 			http.Error(w, "only GET is allowed", http.StatusMethodNotAllowed)
 		}
@@ -219,9 +219,8 @@ func (srv *SnuggieServer) registerJob(meshfile multipart.File, header *multipart
 	err = srv.S.ScheduleSliceJob(job.ID, url, slicerBackend, preset)
 	if err != nil {
 		os.Remove(path)
-		//TODO:
-		//DeleteGCodeFile(job.ID)
-		//DeleteJob(job.ID)
+		DeleteGCodeFile(job.ID)
+		DeleteJob(job.ID)
 		return nil, err
 	}
 
@@ -240,6 +239,21 @@ func (srv *SnuggieServer) lookupJob(id string) (*slicerjob.Job, error) {
 		return nil, err
 	}
 	return job, nil
+}
+
+func (srv *SnuggieServer) DeleteJob(w http.ResponseWriter, r *http.Request) {
+	id, _ := srv.trimPath(r.URL.Path, "/jobs/")
+	_, err := srv.lookupJob(id)
+	if err != nil {
+		http.Error(w, "lookup: "+err.Error(), http.StatusNotFound)
+		return
+	}
+	srv.S.CancelSliceJob(id)
+	CancelJob(id)
+
+	if err != nil {
+		log.Printf("http response: %v", err)
+	}
 }
 
 func (srv *SnuggieServer) url(pathquery string) string {
@@ -284,6 +298,7 @@ func (srv *SnuggieServer) RunConsumer() {
 			log.Printf("consumer: %v", err)
 			return
 		}
+
 		type jobResult struct {
 			path string
 			err  error

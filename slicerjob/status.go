@@ -15,6 +15,7 @@ const (
 	Processing
 	Complete
 	Failed
+	Cancelled
 	Invalid
 )
 
@@ -54,6 +55,7 @@ var statusStrings = []string{
 	Processing: "processing",
 	Complete:   "complete",
 	Failed:     "failed",
+	Cancelled:  "cancelled",
 	Invalid:    "INVALIDSTATUS",
 }
 
