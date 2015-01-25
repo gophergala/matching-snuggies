@@ -62,8 +62,8 @@ func PutJob(key string, job *slicerjob.Job) error {
 	})
 }
 
-func ViewGCodeFile(key, val string) (string, error) {
-	err := DB.View(func(tx *bolt.Tx) error {
+func ViewGCodeFile(key string) (val string, err error) {
+	err = DB.View(func(tx *bolt.Tx) error {
 		val = string(tx.Bucket(b("gCodeFiles")).Get(b(key)))
 		return nil
 	})

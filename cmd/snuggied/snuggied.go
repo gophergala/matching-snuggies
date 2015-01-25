@@ -122,8 +122,8 @@ M104 S195 ; set temperature
 
 func (srv *SnuggieServer) GetMesh(w http.ResponseWriter, r *http.Request) {
 	id, _ := srv.trimPath(r.URL.Path, "/meshes/")
-	path := queue[id]
-	if path == "" {
+	path, err := ViewGCodeFile(id)
+	if err != nil {
 		http.Error(w, "unknown mesh id", http.StatusNotFound)
 		return
 	}
@@ -226,15 +226,6 @@ func (srv *SnuggieServer) lookupJob(id string) (*slicerjob.Job, error) {
 	if err != nil {
 		err := fmt.Errorf("json unmarshal problem: %v", id)
 		return nil, err
-	} else {
-		log.Println("mocking status")
-		//mock progress
-		job.Progress += 0.1
-		if job.Progress >= 1.0 {
-			job.Status = slicerjob.Complete
-		}
-		PutJob(id, job)
-		//end mock progress
 	}
 	return job, nil
 }
@@ -243,16 +234,26 @@ func (srv *SnuggieServer) url(pathquery string) string {
 	return srv.Config["URL"] + srv.Prefix + pathquery
 }
 
-// JobDone stores the location of the successful output g-code for job id.  it
-// returns the url of the gcode resource.
+// JobDone stores the location of the successful output g-code for job id
 func (srv *SnuggieServer) JobDone(id, path string, err error) {
 	if err != nil {
 		log.Printf("FIXME -- failed job:%v err:%v", id, err)
 		return
 	}
 
-	// TODO:
-	// write the gcode path to the database
+	job, err := ViewJob(id)
+	if err != nil {
+		log.Printf("Can't view job from database:%v err:%v", id, err)
+		return
+	}
+	job.Status = slicerjob.Complete
+	job.GCodeURL = path
+	job.Progress = 1.0
+
+	err = PutJob(id, job)
+	if err != nil {
+		log.Printf("Can't put job to database:%v err:%v", id, err)
+	}
 
 	log.Printf("completed job:%v gcode:%v", id, path)
 }
