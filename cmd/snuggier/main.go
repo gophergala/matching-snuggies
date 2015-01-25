@@ -147,7 +147,7 @@ func (c *Client) SliceFile(backend, preset string, path string) (*slicerjob.Job,
 		return nil, fmt.Errorf("POST /slicer/jobs: %v", err)
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode != 200 {
+	if resp.StatusCode != http.StatusAccepted {
 		return nil, httpStatusError(resp)
 	}
 	err = json.NewDecoder(resp.Body).Decode(&job)
@@ -192,7 +192,7 @@ func (c *Client) Cancel(job *slicerjob.Job) error {
 		return err
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode != 200 {
+	if resp.StatusCode != http.StatusOK {
 		return httpStatusError(resp)
 	}
 	return nil
@@ -211,7 +211,7 @@ func (c *Client) SlicerStatus(job *slicerjob.Job) (*slicerjob.Job, error) {
 		return nil, fmt.Errorf("GET /slicer/jobs/: %v", err)
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode != 200 {
+	if resp.StatusCode != http.StatusOK {
 		return nil, httpStatusError(resp)
 	}
 	err = json.NewDecoder(resp.Body).Decode(&jobcurr)
@@ -229,7 +229,7 @@ func (c *Client) GCode(job *slicerjob.Job) (io.ReadCloser, error) {
 	if err != nil {
 		return nil, fmt.Errorf("GET /slicer/codes/: %v", err)
 	}
-	if resp.StatusCode != 200 {
+	if resp.StatusCode != http.StatusOK {
 		return nil, httpStatusError(resp)
 	}
 	return resp.Body, nil

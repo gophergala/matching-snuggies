@@ -171,6 +171,7 @@ func (srv *SnuggieServer) CreateJob(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	w.WriteHeader(http.StatusAccepted)
 	w.Write(jsonJob)
 }
 
