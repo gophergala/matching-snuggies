@@ -45,8 +45,8 @@ tool.
 ./bin/snuggier -preset=hq -o FirstCube.gcode testdata/FirstCube.amf
 ```
 
-Goals
------
+Long term goals
+---------------
 
 - daemon exposing slic3r over HTTP (authenticated)
 - integration with other backend slicers (Cura)
