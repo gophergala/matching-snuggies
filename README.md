@@ -64,7 +64,7 @@ Host Integration
 ----------------
 
 ```
-./bin/snuggier -preset=hq -o composition.gcode composition.amf
+./bin/snuggier -preset=hq -o FirstCube.gcode testdata/FirstCube.amf
 ```
 
 Goals
