@@ -91,6 +91,16 @@ func (srv *SnuggieServer) RegisterHandlers(mux *http.ServeMux) http.Handler {
 			http.Error(w, "only GET is allowed", http.StatusMethodNotAllowed)
 		}
 	})
+
+	mux.HandleFunc(srv.route("/presets/"), func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case "GET":
+			srv.GetPresets(w, r)
+		default:
+			http.Error(w, "only GET is allowed", http.StatusMethodNotAllowed)
+		}
+	})
+
 	return mux
 }
 
@@ -133,6 +143,21 @@ func (srv *SnuggieServer) GetMesh(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	http.ServeFile(w, r, path)
+}
+
+func (srv *SnuggieServer) GetPresets(w http.ResponseWriter, r *http.Request) {
+	id, _ := srv.trimPath(r.URL.Path, "/presets/")
+	log.Println(id)
+	if id != "slic3r" {
+		http.Error(w, "only slic3r is supported at this time", http.StatusNotFound)
+		return
+	}
+	jsonPresets, err := json.Marshal(srv.Slic3rPresets)
+	if err != nil {
+		http.Error(w, "slic3r presets json error", http.StatusInternalServerError)
+		return
+	}
+	w.Write(jsonPresets)
 }
 
 func (srv *SnuggieServer) GetJob(w http.ResponseWriter, r *http.Request) {
