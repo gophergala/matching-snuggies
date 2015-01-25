@@ -208,7 +208,7 @@ func (c *Client) SlicerStatus(job *slicerjob.Job) (*slicerjob.Job, error) {
 	log.Printf("GET %v", url)
 	resp, err := c.client().Get(url)
 	if err != nil {
-		return nil, fmt.Errorf("POST /slicer/jobs/: %v", err)
+		return nil, fmt.Errorf("GET /slicer/jobs/: %v", err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != 200 {
@@ -224,10 +224,10 @@ func (c *Client) SlicerStatus(job *slicerjob.Job) (*slicerjob.Job, error) {
 // GCode requests the gcode for job.
 func (c *Client) GCode(job *slicerjob.Job) (io.ReadCloser, error) {
 	url := c.url("/slicer/gcodes/" + job.ID)
-	log.Printf("POST %v", url)
+	log.Printf("GET %v", url)
 	resp, err := c.client().Get(url)
 	if err != nil {
-		return nil, fmt.Errorf("POST /slicer/jobs/: %v", err)
+		return nil, fmt.Errorf("GET /slicer/codes/: %v", err)
 	}
 	if resp.StatusCode != 200 {
 		return nil, httpStatusError(resp)
