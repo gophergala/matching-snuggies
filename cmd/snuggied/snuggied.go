@@ -320,9 +320,23 @@ func (srv *SnuggieServer) runConsumerJob(job *Job) (path string, err error) {
 }
 
 func main() {
-	dataDir := flag.String("dataDir", "/tmp", "location for database, .stl, .gcode")
+	dataDir := flag.String("data", "/tmp", "location for database, .stl, .gcode")
 	httpAddr := flag.String("http", ":8888", "address to serve traffic")
 	flag.Parse()
+
+	// make sure that dataDir is a directory and that it's path is absolute.
+	// forcing absolute paths is merely a simple way to prevent weird bugs
+	// later on.
+	stat, err := os.Stat(*dataDir)
+	if err != nil {
+		log.Fatalf("data directory: %v", err)
+	}
+	if !stat.IsDir() {
+		log.Fatalf("data path is a not directory: %v", err)
+	}
+	if !filepath.IsAbs(*dataDir) {
+		log.Fatalf("data directory is not an absolute path: %v", *dataDir)
+	}
 
 	srv := &SnuggieServer{
 		Config:  config,
