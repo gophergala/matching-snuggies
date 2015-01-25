@@ -53,7 +53,8 @@ type MemQueue struct {
 var _ Scheduler = new(MemQueue)
 var _ Consumer = new(MemQueue)
 
-// MemoryQueue allocates and initializes a new MemQueue.
+// MemoryQueue allocates and initializes a new MemQueue.  The function argument
+// is called when consumers finish work on a job.
 func MemoryQueue(done func(id, path string, err error)) *MemQueue {
 	return &MemQueue{
 		Done: done,
