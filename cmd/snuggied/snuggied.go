@@ -3,7 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"log"
 	"mime/multipart"
 	"net/http"
@@ -150,7 +150,7 @@ func (srv *SnuggieServer) GetJob(w http.ResponseWriter, r *http.Request) {
 
 func (srv *SnuggieServer) CreateJob(w http.ResponseWriter, r *http.Request) {
 	//TODO make sure meshfile is at least .stl
-	meshfile, _, err := r.FormFile("meshfile")
+	meshfile, fileheader, err := r.FormFile("meshfile")
 	if err != nil {
 		http.Error(w, "bad meshfile, or 'meshfile' field not present", http.StatusBadRequest)
 		return
@@ -168,7 +168,7 @@ func (srv *SnuggieServer) CreateJob(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	job, err := srv.registerJob(meshfile, slicerBackend, preset)
+	job, err := srv.registerJob(meshfile, fileheader, slicerBackend, preset)
 	if err != nil {
 		// TODO: distinguish unknown preset (Bad Request) from backend failure.
 		http.Error(w, "registration failed: "+err.Error(), http.StatusInternalServerError)
@@ -184,7 +184,7 @@ func (srv *SnuggieServer) CreateJob(w http.ResponseWriter, r *http.Request) {
 	w.Write(jsonJob)
 }
 
-func (srv *SnuggieServer) registerJob(meshfile multipart.File, slicerBackend string, preset string) (*slicerjob.Job, error) {
+func (srv *SnuggieServer) registerJob(meshfile multipart.File, header *multipart.FileHeader, slicerBackend string, preset string) (*slicerjob.Job, error) {
 	job := slicerjob.New()
 
 	//do stuff to the job.
@@ -193,21 +193,27 @@ func (srv *SnuggieServer) registerJob(meshfile multipart.File, slicerBackend str
 	job.URL = srv.url("/jobs/" + job.ID)
 
 	//if location flag not set, default temp file location is used
-	tmp, err := ioutil.TempFile(srv.DataDir, job.ID+"-")
+	ext := filepath.Ext(header.Filename)
+	path := filepath.Join(srv.DataDir, job.ID+ext)
+	f, err := os.Create(path)
 	if err != nil {
-		return nil, fmt.Errorf("meshfile not saved: %v", err)
+		return nil, fmt.Errorf("meshfile create: %v", err)
 	}
-	defer tmp.Close()
+	_, err = io.Copy(f, meshfile)
+	if err != nil {
+		f.Close()
+		return nil, fmt.Errorf("meshfile write: %v", err)
+	}
 
-	queue[job.ID] = tmp.Name()
+	queue[job.ID] = path
 	store[job.ID] = job
 	url := srv.url("/meshes/" + job.ID)
 	if srv.LocalConsumer {
-		url = "file://" + tmp.Name()
+		url = "file://" + path
 	}
 	err = srv.S.ScheduleSliceJob(job.ID, url, slicerBackend, preset)
 	if err != nil {
-		os.Remove(tmp.Name())
+		os.Remove(path)
 		delete(queue, job.ID)
 		delete(store, job.ID)
 		return nil, err
@@ -309,7 +315,7 @@ func (srv *SnuggieServer) runConsumerJob(job *Job) (path string, err error) {
 }
 
 func main() {
-	dataDir := flag.String("dataDir", "", "set meshfile save location")
+	dataDir := flag.String("dataDir", "/tmp", "location for database, .stl, .gcode")
 	httpAddr := flag.String("http", ":8888", "address to serve traffic")
 	flag.Parse()
 

@@ -60,7 +60,7 @@ func (s *Slic3r) SlicerCmd() *SlicerCmd {
 	var args []string
 	config := s.ConfigPath
 	if config != "" {
-		args = append(args, config)
+		args = append(args, "--load", config)
 	}
 	out := s.OutPath
 	if out != "" {
