@@ -171,12 +171,7 @@ func (srv *SnuggieServer) registerJob(meshfile multipart.File, slicerBackend str
 
 	PutGCodeFile(job.ID, tmp.Name())
 
-	jsonJob, err := json.Marshal(job)
-	if err != nil {
-		return nil, fmt.Errorf("job not marshalled: %v", err)
-	}
-
-	err = PutJob(job.ID, jsonJob)
+	err = PutJob(job.ID, job)
 	if err != nil {
 		return nil, err
 	}
@@ -185,13 +180,11 @@ func (srv *SnuggieServer) registerJob(meshfile multipart.File, slicerBackend str
 }
 
 func (srv *SnuggieServer) lookupJob(id string) (*slicerjob.Job, error) {
-	jsonJob, err := ViewJob(id)
+	job, err := ViewJob(id)
 	if err != nil {
 		err := fmt.Errorf("Job not found with id: %v", id)
 		return nil, err
 	}
-	var job = new(slicerjob.Job)
-	err = json.Unmarshal(jsonJob, job)
 
 	if err != nil {
 		err := fmt.Errorf("json unmarshal problem: %v", id)
@@ -203,12 +196,7 @@ func (srv *SnuggieServer) lookupJob(id string) (*slicerjob.Job, error) {
 		if job.Progress >= 1.0 {
 			job.Status = slicerjob.Complete
 		}
-		jsonJob, err := json.Marshal(job)
-		if err != nil {
-			err := fmt.Errorf("json marshal problem: %v", id)
-			return nil, err
-		}
-		PutJob(id, jsonJob)
+		PutJob(id, job)
 		//end mock progress
 	}
 	return job, nil

@@ -1,9 +1,11 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 
 	"github.com/boltdb/bolt"
+	"github.com/gophergala/matching-snuggies/slicerjob"
 )
 
 func b(s string) []byte {
@@ -34,43 +36,48 @@ func loadDB() *bolt.DB {
 }
 
 func PutGCodeFile(key string, value string) error {
-	return puttIt(key, b(value), "gCodeFiles")
-}
-
-func PutJob(key string, value []byte) error {
-	return puttIt(key, value, "jobs")
-}
-
-func puttIt(key string, value []byte, bucketName string) error {
+	bucketName := "gCodeFiles"
 	return DB.Update(func(tx *bolt.Tx) error {
 		bucket := tx.Bucket(b(bucketName))
 		if bucket == nil {
 			return fmt.Errorf("%v bucket doesn't exist!", bucketName)
 		}
-		err := bucket.Put(b(key), value)
-		if err != nil {
-			return err
-		}
-		return nil
+		return bucket.Put(b(key), b(value))
 	})
 }
 
-func ViewGCodeFile(key string, value string) (string, error) {
-	val, err := viewIt(key, "gCodeFiles")
+func PutJob(key string, job *slicerjob.Job) error {
+	jsonJob, err := json.Marshal(job)
+	if err != nil {
+		return err
+	}
+
+	return DB.Update(func(tx *bolt.Tx) error {
+		bucketName := "jobs"
+		bucket := tx.Bucket(b(bucketName))
+		if bucket == nil {
+			return fmt.Errorf("%v bucket doesn't exist!", bucketName)
+		}
+		return bucket.Put(b(key), jsonJob)
+	})
+}
+
+func ViewGCodeFile(key, val string) (string, error) {
+	err := DB.View(func(tx *bolt.Tx) error {
+		val = string(tx.Bucket(b("gCodeFiles")).Get(b(key)))
+		return nil
+	})
 	if err != nil {
 		return "", err
 	}
 	return string(val), nil
 }
 
-func ViewJob(key string) (val []byte, err error) {
-	return viewIt(key, "jobs")
-}
-
-func viewIt(key, bucketName string) (val []byte, err error) {
-	err = DB.View(func(tx *bolt.Tx) error {
-		val = tx.Bucket(b(bucketName)).Get(b(key))
-		return nil
+func ViewJob(key string) (*slicerjob.Job, error) {
+	var job = new(slicerjob.Job)
+	err := DB.View(func(tx *bolt.Tx) error {
+		jsonJob := tx.Bucket(b("jobs")).Get(b(key))
+		return json.Unmarshal(jsonJob, job)
 	})
-	return val, err
+	return job, err
 }
