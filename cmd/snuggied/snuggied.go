@@ -107,7 +107,7 @@ func (srv *SnuggieServer) GetGCode(w http.ResponseWriter, r *http.Request) {
 	id, _ := srv.trimPath(r.URL.Path, "/gcodes/")
 	path, err := ViewGCodeFile(id)
 	if err != nil {
-		http.Error(w, "unknown mesh id", http.StatusNotFound)
+		http.Error(w, "unknown id", http.StatusNotFound)
 		return
 	}
 	http.ServeFile(w, r, path)
@@ -117,7 +117,7 @@ func (srv *SnuggieServer) GetMesh(w http.ResponseWriter, r *http.Request) {
 	id, _ := srv.trimPath(r.URL.Path, "/meshes/")
 	path, err := ViewGCodeFile(id)
 	if err != nil {
-		http.Error(w, "unknown mesh id", http.StatusNotFound)
+		http.Error(w, "unknown id", http.StatusNotFound)
 		return
 	}
 	http.ServeFile(w, r, path)
