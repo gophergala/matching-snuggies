@@ -15,8 +15,8 @@ Documentation
 Install
 -------
 
-First install [slic3r](http://slic3r.org/download), the slic3r Matching
-Snuggies has chosen to support initially.
+First install [slic3r](http://slic3r.org/download), the backend slicing
+software Matching Snuggies has chosen to support initially.
 
 NOTE: OS X users should symlink the executable at Slicer.app/MacOS/slicer into
 their environment's PATH.
