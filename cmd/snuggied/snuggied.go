@@ -199,7 +199,7 @@ func (srv *SnuggieServer) registerJob(meshfile multipart.File, header *multipart
 
 	err = PutMeshFile(job.ID, path)
 	if err != nil {
-		return nil, fmt.Errorf("")
+		return nil, fmt.Errorf("meshfile: %v", err)
 	}
 
 	err = PutJob(job.ID, job)
