@@ -32,11 +32,11 @@ A REST API is exposed to schedule slicing jobs, retrieve resulting gcode, and
 get periodic status updates while slicing is in progress.
 
 ```
-./bin/snuggied -http=:8080
+./bin/snuggied -slic3r.configs=testdata
 ```
 
 ```
-$ curl http://localhost:8888/slicer/jobs -F slicer=slic3r -Fpreset=hiqual -F meshfile=@testdata/FirstCube.stl
+$ curl http://localhost:8888/slicer/jobs -F slicer=slic3r -F preset=hq -F meshfile=@testdata/FirstCube.stl
 {"id":"e2df75e4-714d-408a-924b-9284bf41a533","status":"accepted","progress":0,"url":"http://localhost:8888/slicer/jobs/e2df75e4-714d-408a-924b-9284bf41a533","gcode_url":""}
 ```
 
@@ -64,7 +64,7 @@ Host Integration
 ----------------
 
 ```
-./bin/snuggier -preset=hq-printrbot -o composition.gcode composition.amf
+./bin/snuggier -preset=hq -o FirstCube.gcode testdata/FirstCube.amf
 ```
 
 Goals
