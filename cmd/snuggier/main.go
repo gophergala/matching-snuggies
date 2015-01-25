@@ -33,17 +33,29 @@ func main() {
 	server := flag.String("server", "localhost:8888", "snuggied server address")
 	slicerBackend := flag.String("backend", "slic3r", "backend slicer")
 	slicerPreset := flag.String("preset", "hq", "specify a configuration preset for the backend")
+	presets := flag.Bool("L", false, "get list of available configuration presets for Slic3r")
 	gcodeDest := flag.String("o", "", "specify an output gcode filename")
 	flag.Parse()
+
+	client := &Client{
+		ServerAddr: *server,
+	}
+
+	if *presets == true {
+		presets, err := client.SlicerPresets()
+		if err != nil {
+			fmt.Errorf("something bad happened: %v", err)
+		}
+		for i := range presets {
+			fmt.Println(presets[i])
+		}
+		return
+	}
 
 	if flag.NArg() < 1 {
 		log.Fatalf("missing argument: mesh file")
 	}
 	meshpath := flag.Arg(0)
-
-	client := &Client{
-		ServerAddr: *server,
-	}
 
 	// start intercepting signals from the operating system
 	sig := make(chan os.Signal, 1)
@@ -221,6 +233,27 @@ func (c *Client) Cancel(job *slicerjob.Job) error {
 		return httpStatusError(resp)
 	}
 	return nil
+}
+
+func (c *Client) SlicerPresets() ([]string, error) {
+	url := c.url("/slicer/presets/slic3r")
+	//log.Printf("GET %v", url)
+	resp, err := c.client().Get(url)
+	if err != nil {
+		return nil, fmt.Errorf("GET /slicer/presets/slic3r: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, httpStatusError(resp)
+	}
+	preset := new(slicerjob.SlicerPreset)
+	err = json.NewDecoder(resp.Body).Decode(preset)
+	if err != nil {
+		return nil, fmt.Errorf("GET /slicer/presets/slic3r: %v", err)
+	}
+
+	return preset.Presets, nil
 }
 
 // SlicerStatus returns a current copy of the provided job.

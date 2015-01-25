@@ -48,11 +48,6 @@ type SnuggieServer struct {
 	C             Consumer
 }
 
-type SlicerPreset struct {
-	Slicer  string   `json:slicer`
-	Presets []string `json:presets`
-}
-
 func (srv *SnuggieServer) RegisterHandlers(mux *http.ServeMux) http.Handler {
 	mux.HandleFunc(srv.route("/jobs"), func(w http.ResponseWriter, r *http.Request) {
 		// the request does not have an ID suffix on the url path so we are
@@ -161,7 +156,7 @@ func (srv *SnuggieServer) GetPresets(w http.ResponseWriter, r *http.Request) {
 	for k := range srv.Slic3rPresets {
 		presetKeys = append(presetKeys, k)
 	}
-	presets := &SlicerPreset{
+	presets := &slicerjob.SlicerPreset{
 		Slicer:  "slic3r",
 		Presets: presetKeys,
 	}
