@@ -10,8 +10,10 @@ import (
 	"mime/multipart"
 	"net/http"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/gophergala/matching-snuggies/slicerjob"
@@ -33,6 +35,10 @@ func main() {
 		ServerAddr: *server,
 	}
 
+	// start intercepting signals from the operating system
+	sig := make(chan os.Signal, 1)
+	signal.Notify(sig, os.Interrupt, syscall.SIGTERM)
+
 	// send files to the slicer to be printed and poll the slicer until the job
 	// has completed.
 	log.Printf("sending file(s) to snuggied server at %v", *server)
@@ -44,6 +50,17 @@ func main() {
 	for job.Status != slicerjob.Complete {
 		// TODO: retry with exponential backoff on network failure
 		select {
+		case s := <-sig:
+			// stop intercepting signals. if the job cancellation is taking too
+			// long let the future signals terminate the process naturally.
+			signal.Stop(sig)
+			log.Printf("signal: %v", s)
+			err := client.Cancel(job)
+			if err != nil {
+				log.Printf("failed to cancel job: %v", err)
+			}
+			log.Printf("slicing job canceled")
+			return
 		case <-tick:
 			job, err = client.SlicerStatus(job)
 			if err != nil {
@@ -158,6 +175,28 @@ func (c *Client) writeJobForm(w *multipart.Writer, backend, preset, filename str
 	return w.Close()
 }
 
+func (c *Client) Cancel(job *slicerjob.Job) error {
+	if job.ID == "" {
+		return fmt.Errorf("job missing id")
+	}
+	url := c.url("/slicer/jobs/" + job.ID)
+	log.Printf("DELETE %v", url)
+	req, err := http.NewRequest("DELETE", url, nil)
+	if err != nil {
+		return fmt.Errorf("request: %v", err)
+	}
+	resp, err := c.client().Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		body, _ := ioutil.ReadAll(resp.Body)
+		return fmt.Errorf("HTTP %v: %s", http.StatusText(resp.StatusCode), body)
+	}
+	return nil
+}
+
 // SlicerStatus returns a current copy of the provided job.
 func (c *Client) SlicerStatus(job *slicerjob.Job) (*slicerjob.Job, error) {
 	if job.ID == "" {
@@ -165,7 +204,7 @@ func (c *Client) SlicerStatus(job *slicerjob.Job) (*slicerjob.Job, error) {
 	}
 	var jobcurr *slicerjob.Job
 	url := c.url("/slicer/jobs/" + job.ID)
-	log.Printf("POST %v", url)
+	log.Printf("GET %v", url)
 	resp, err := c.client().Get(url)
 	if err != nil {
 		return nil, fmt.Errorf("POST /slicer/jobs/: %v", err)
