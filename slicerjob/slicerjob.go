@@ -4,7 +4,7 @@ import "code.google.com/p/go-uuid/uuid"
 
 type Job struct {
 	ID       string  `json:"id"`
-	Status   string  `json:"status"`
+	Status   Status  `json:"status"`
 	Progress float64 `json:"progress"`
 	URL      string  `json:"url"`
 	GCodeURL string  `json:"gcode_url"`
