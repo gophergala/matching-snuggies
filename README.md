@@ -60,6 +60,10 @@ When `snuggied` is running on another host specify the server when calling `snug
 ./bin/snuggier -server=10.0.10.123:8888 -preset=hq -o FirstCube.gcode testdata/FirstCube.amf
 ```
 
+Because no host software integrates with Matching Snuggies at this time you
+must run this command and load the resulting `FirstCube.gcode` into your host
+software manually (most hosts support this function).
+
 See the snuggier command documentation on godoc.org
 [godoc.org](http://godoc.org/github.com/gophergala/matching-snuggies/cmd/snuggier).
 
