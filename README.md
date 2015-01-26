@@ -61,8 +61,9 @@ When `snuggied` is running on another host specify the server when calling `snug
 ```
 
 Because no host software integrates with Matching Snuggies at this time you
-must run this command and load the resulting `FirstCube.gcode` into your host
-software manually (most hosts support this function).
+must run this command manually and load the resulting `FirstCube.gcode` into
+your host software in order to print the object (most hosts support this
+function).
 
 See the snuggier command documentation on godoc.org
 [godoc.org](http://godoc.org/github.com/gophergala/matching-snuggies/cmd/snuggier).
