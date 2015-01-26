@@ -27,7 +27,7 @@ NOTE: OS X users should symlink the executable at
 On your server machine, install [slic3r](http://slic3r.org/download), the
 backend slicing software, onto the machine you want to act as your server.
 Then create a directory containing the Slic3r configuration files you would
-like clients to have make available.  See the Slic3r [doc](slic3r/README.md)
+like clients to have made available.  See the Slic3r [doc](slic3r/README.md)
 for more information.
 
 Slicing Server
