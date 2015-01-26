@@ -342,7 +342,7 @@ func (srv *SnuggieServer) runConsumerJob(job *Job) (path string, err error) {
 func main() {
 	machineID := flag.String("name", "snuggied0", "machine name for clustering")
 	slic3rBin := flag.String("slic3r.bin", "", "specify slic3r location")
-	slic3rConfigDir := flag.String("slic3r.configs", "", "specify a directory with slic3r configuration")
+	slic3rConfigDir := flag.String("slic3r.configs", ".", "specify a directory with slic3r preset configurations")
 	dataDir := flag.String("data", "/tmp", "location for database, .stl, .gcode")
 	httpAddr := flag.String("http", ":8888", "address to serve traffic")
 	baseURL := flag.String("baseurl", "", "links and redirection go to the specified base url")
