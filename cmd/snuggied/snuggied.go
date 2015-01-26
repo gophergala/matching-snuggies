@@ -189,14 +189,18 @@ func (srv *SnuggieServer) CreateJob(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "slicer not supported", http.StatusBadRequest)
 		return
 	}
+	var presets []string
+	for p := range srv.Slic3rPresets {
+		presets = append(presets, p)
+	}
 
 	preset := r.FormValue("preset")
 	if preset == "" {
-		http.Error(w, "invalid preset", http.StatusBadRequest)
+		http.Error(w, "invalid preset: must be one of ["+strings.Join(presets, " ")+"]", http.StatusBadRequest)
 		return
 	}
 	if path := srv.Slic3rPresets[preset]; path == "" {
-		http.Error(w, "unknown preset", http.StatusBadRequest)
+		http.Error(w, "unknown preset: must be one of ["+strings.Join(presets, " ")+"]", http.StatusBadRequest)
 		return
 	}
 
