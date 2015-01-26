@@ -18,8 +18,9 @@ Documentation
 Install
 -------
 
-NOTE: OS X users should symlink the executable at Slicer.app/MacOS/slicer into
-their environment's PATH.
+NOTE: OS X users should symlink the executable at
+/Applications/Slic3r.app/Contents/MacOS/slic3r into their environment's PATH
+(e.g. to /usr/bin/slic3r).
 
 ./build.sh
 
